@@ -87,7 +87,11 @@ The panel is fully configured from the web editor (`http://<panel-ip>`):
 | ![UI](images/screenshots/07-settings-ui.png) | ![Theme](images/screenshots/08-settings-theme.png) | ![Setup AP](images/screenshots/09-settings-ap.png) |
 | ![Firmware Update](images/screenshots/10-settings-firmware.png) | ![System](images/screenshots/11-settings-system.png) | ![Logs](images/screenshots/12-settings-logs.png) |
 
-> 📸 A photo of the panel mounted on the wall will be added by the author.
+### On the wall
+
+![Guiton 4 panel mounted and working](images/panel-on-wall.jpg)
+
+*Guiton 4 panel (ESP32-S3-4848S040) running the `panels3` firmware — mounted on the wall and working.*
 
 ---
 
