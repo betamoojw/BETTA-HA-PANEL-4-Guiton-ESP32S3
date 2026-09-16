@@ -25,6 +25,19 @@ after first boot via the panel's web UI.
 
 Parametry pamięci flash: **chip `esp32s3`**, **16 MB**, **DIO**, **80 MHz**.
 
+### Wersja i sumy kontrolne / Version and checksums
+
+| Plik / File | Rozmiar / Size | `SHA256` |
+|---|---|---|
+| `guition-4-esp32s3.factory.bin` | 3 382 400 B | `1EA3B5CC65104C6AF71D65ECF8C5F592480D459BBFA048B31BCDBAEE5178050C` |
+| `betta-ha-panel-s3.bin` | 3 251 328 B | `014EADB219FFD366B974163C72B94BD69899A45F21C9629497A797410D8B8CC8` |
+| `bootloader.bin` | 20 912 B | `400CB58DCFEF3F9D9758DE2197093E80A6336B09C810DA712B4725ACEA23C875` |
+| `partition-table.bin` | 3 072 B | `8F444929E66F5C9FD262B2CCBCE847429E706D83F852EB47E8DE8D36B5127126` |
+| `ota_data_initial.bin` | 8 192 B | `7D2C7AC4888BFD75CD5F56E8D61F69595121183AFC81556C876732FD3782C62F` |
+
+Wersja firmware: **v0.8.2** (wariant `panels3`, optymalizacja `-O2` / `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, WebUI serwowane jako gzip).
+Firmware version: **v0.8.2** (`panels3` variant, `-O2` / `CONFIG_COMPILER_OPTIMIZATION_PERF=y`, WebUI served gzipped).
+
 ---
 
 ## Sposób 1 — jeden plik (najłatwiejszy) / One file (easiest)

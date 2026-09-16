@@ -965,7 +965,12 @@ static void alarm_show_failed_arm(w_alarm_tile_t *ctx, const cJSON *data)
 
     const char *title = alarm_i18n("alarm.failed_arm", "Arming failed");
     if (detail[0] != '\0') {
-        snprintf(ctx->alarmo_text, sizeof(ctx->alarmo_text), "%s: %s", title, detail);
+        /* This line is truncated on purpose, but detail is a full alarmo_text sized
+         * array, so gcc treats a plain "%s: %s" as losing the ": " separator and warns
+         * (-Werror=format-truncation, fatal in debug builds). Going through the helper
+         * keeps the build time format analysis out of the way. */
+        snprintf(ctx->alarmo_text, sizeof(ctx->alarmo_text), "%s", title);
+        alarm_text_appendf(ctx->alarmo_text, sizeof(ctx->alarmo_text), ": %s", detail);
     } else {
         snprintf(ctx->alarmo_text, sizeof(ctx->alarmo_text), "%s", title);
     }
