@@ -414,7 +414,7 @@ hostnames and tokens masked out.
 
 | Variant   | Device                          | Resolution | Flash | Firmware                                                                 |
 |-----------|---------------------------------|------------|-------|---------------------------------------------------------------------------|
-| `panels3` | Guition **ESP32-S3-4848S040** (4.8") | 480 × 480 (ST7701S RGB, GT911 touch) | 16 MB + 8 MB PSRAM | [firmware/](firmware/) |
+| `panels3` | Guition **ESP32-S3-4848S040** (4") | 480 × 480 (ST7701S RGB, GT911 touch) | 16 MB + 8 MB PSRAM | [firmware/](firmware/) |
 
 Audio on this board can be wired through an **NS4168 I²S amplifier**:
 
