@@ -14,6 +14,9 @@ const char *const ha_alarm_event_type_names[HA_ALARM_EVENT_TYPES] = {
     "alarmo_ready_to_arm_modes_updated",
 };
 
+_Static_assert(sizeof("alarmo_ready_to_arm_modes_updated") <= HA_ALARM_EVENT_TYPE_LEN,
+               "HA_ALARM_EVENT_TYPE_LEN must fit the longest subscribed event type");
+
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static ha_alarm_event_t s_latest;
 static bool s_have_event;

@@ -17,7 +17,10 @@
 #include "cJSON.h"
 
 #define HA_ALARM_EVENT_TYPES 3
-#define HA_ALARM_EVENT_TYPE_LEN 32
+/* Must hold the longest subscribed name - "alarmo_ready_to_arm_modes_updated" is 33
+ * characters - plus the terminator. A shorter buffer truncates the stored type and the
+ * strcmp() done by the alarm tile then never matches. */
+#define HA_ALARM_EVENT_TYPE_LEN 48
 #define HA_ALARM_EVENT_PAYLOAD_LEN 512
 
 /* Event types the client subscribes to (used both for the subscription and for
