@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "esp_check.h"
 #include "esp_log.h"
@@ -14,60 +15,80 @@
 #include "app_config.h"
 #include "util/log_tags.h"
 
-extern const uint8_t _binary_index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t _binary_index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t _binary_app_js_start[] asm("_binary_app_js_start");
-extern const uint8_t _binary_app_js_end[] asm("_binary_app_js_end");
-extern const uint8_t _binary_styles_css_start[] asm("_binary_styles_css_start");
-extern const uint8_t _binary_styles_css_end[] asm("_binary_styles_css_end");
+/* The WebUI assets are embedded gzipped (see components/webui/CMakeLists.txt). */
+extern const uint8_t _binary_index_html_gz_start[] asm("_binary_index_html_gz_start");
+extern const uint8_t _binary_index_html_gz_end[] asm("_binary_index_html_gz_end");
+extern const uint8_t _binary_app_js_gz_start[] asm("_binary_app_js_gz_start");
+extern const uint8_t _binary_app_js_gz_end[] asm("_binary_app_js_gz_end");
+extern const uint8_t _binary_styles_css_gz_start[] asm("_binary_styles_css_gz_start");
+extern const uint8_t _binary_styles_css_gz_end[] asm("_binary_styles_css_gz_end");
 
-static const char *s_fallback_index_html =
+static const char *s_plain_client_index_html =
     "<!doctype html><html><head><meta charset=\"utf-8\"><title>BETTA Editor</title>"
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>"
-    "<body><h1>BETTA Editor</h1><p>WebUI asset missing, check EMBED_TXTFILES.</p></body></html>";
-static const char *s_fallback_app_js = "console.log('BETTA WebUI fallback active');";
-static const char *s_fallback_styles_css = "body{font-family:sans-serif;padding:20px}";
+    "<body><h1>BETTA Editor</h1><p>The editor is served gzip-compressed. Use a browser, "
+    "or a client that sends Accept-Encoding: gzip.</p></body></html>";
+static const char *s_plain_client_app_js = "console.log('BETTA WebUI requires Accept-Encoding: gzip');";
+static const char *s_plain_client_styles_css = "body{font-family:sans-serif;padding:20px}";
 
 static httpd_handle_t s_server = NULL;
 
-static esp_err_t send_embedded(
+static bool client_accepts_gzip(httpd_req_t *req)
+{
+    char value[128];
+    size_t len = httpd_req_get_hdr_value_len(req, "Accept-Encoding");
+    if (len == 0) {
+        return false;
+    }
+    if (len >= sizeof(value)) {
+        /* Only browsers send a header list long enough to be truncated here, and those
+         * always advertise gzip. */
+        return true;
+    }
+    if (httpd_req_get_hdr_value_str(req, "Accept-Encoding", value, sizeof(value)) != ESP_OK) {
+        return false;
+    }
+    return strstr(value, "gzip") != NULL;
+}
+
+/* index.html loads /app.js and /styles.css without a cache-busting query, so the assets
+ * stay "no-store": a stale copy in the browser after an OTA would look like a broken UI. */
+static esp_err_t send_gzip_asset(
     httpd_req_t *req, const uint8_t *start, const uint8_t *end, const char *content_type, bool cache_assets)
 {
     httpd_resp_set_type(req, content_type);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Cache-Control", cache_assets ? "public, max-age=3600" : "no-store");
-    size_t len = (size_t)(end - start);
-    if (len > 0 && start[len - 1] == '\0') {
-        len--;
-    }
-    return httpd_resp_send(req, (const char *)start, len);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
+    return httpd_resp_send(req, (const char *)start, (ssize_t)(end - start));
 }
 
 static esp_err_t index_get_handler_impl(httpd_req_t *req)
 {
-    if (&_binary_index_html_end[0] > &_binary_index_html_start[0]) {
-        return send_embedded(req, _binary_index_html_start, _binary_index_html_end, "text/html", false);
+    if (!client_accepts_gzip(req)) {
+        httpd_resp_set_type(req, "text/html");
+        return httpd_resp_sendstr(req, s_plain_client_index_html);
     }
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_sendstr(req, s_fallback_index_html);
+    return send_gzip_asset(req, _binary_index_html_gz_start, _binary_index_html_gz_end, "text/html", false);
 }
 
 static esp_err_t app_js_get_handler_impl(httpd_req_t *req)
 {
-    if (&_binary_app_js_end[0] > &_binary_app_js_start[0]) {
-        return send_embedded(req, _binary_app_js_start, _binary_app_js_end, "application/javascript", false);
+    if (!client_accepts_gzip(req)) {
+        httpd_resp_set_type(req, "application/javascript");
+        return httpd_resp_sendstr(req, s_plain_client_app_js);
     }
-    httpd_resp_set_type(req, "application/javascript");
-    return httpd_resp_sendstr(req, s_fallback_app_js);
+    return send_gzip_asset(req, _binary_app_js_gz_start, _binary_app_js_gz_end, "application/javascript", false);
 }
 
 static esp_err_t styles_css_get_handler_impl(httpd_req_t *req)
 {
-    if (&_binary_styles_css_end[0] > &_binary_styles_css_start[0]) {
-        return send_embedded(req, _binary_styles_css_start, _binary_styles_css_end, "text/css", false);
+    if (!client_accepts_gzip(req)) {
+        httpd_resp_set_type(req, "text/css");
+        return httpd_resp_sendstr(req, s_plain_client_styles_css);
     }
-    httpd_resp_set_type(req, "text/css");
-    return httpd_resp_sendstr(req, s_fallback_styles_css);
+    return send_gzip_asset(req, _binary_styles_css_gz_start, _binary_styles_css_gz_end, "text/css", false);
 }
 
 static esp_err_t favicon_get_handler_impl(httpd_req_t *req)
@@ -117,7 +138,8 @@ esp_err_t http_server_start(void)
         http_task_prio = 1;
     }
     cfg.task_priority = http_task_prio;
-    cfg.max_uri_handlers = 40;
+    /* Must cover every route registered in api_routes.c plus the static/index handlers below. */
+    cfg.max_uri_handlers = 48;
 #if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
     cfg.max_open_sockets = 4;
 #else

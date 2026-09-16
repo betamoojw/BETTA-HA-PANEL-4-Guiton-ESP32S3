@@ -38,6 +38,7 @@
 #include "freertos/task.h"
 
 #include "app_config.h"
+#include "app_task.h"
 #include "ui/ui_runtime.h"
 
 #define TAG "syslog"
@@ -521,13 +522,24 @@ static void system_log_heartbeat(void)
     size_t largest_8bit = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     size_t largest_psram = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    /* Internal DRAM splits into separate pools; DMA-capable headroom is what the
+     * RGB panel bounce buffers and the Wi-Fi/lwIP stacks depend on, so it gets
+     * its own figures next to the aggregate internal ones. */
+    size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t largest_internal = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+    size_t free_dma = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    size_t largest_dma = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    size_t free_iram = heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT);
 
-    char line[256];
+    char line[320];
     int n = snprintf(line, sizeof(line),
                      "I sys: uptime=%us heap_free=%u heap_min=%u heap_largest=%u "
-                     "psram_free=%u psram_largest=%u\n",
+                     "psram_free=%u psram_largest=%u int_free=%u int_largest=%u "
+                     "dma_free=%u dma_largest=%u iram_free=%u\n",
                      (unsigned)uptime_s, (unsigned)free_heap, (unsigned)min_heap,
-                     (unsigned)largest_8bit, (unsigned)free_psram, (unsigned)largest_psram);
+                     (unsigned)largest_8bit, (unsigned)free_psram, (unsigned)largest_psram,
+                     (unsigned)free_internal, (unsigned)largest_internal,
+                     (unsigned)free_dma, (unsigned)largest_dma, (unsigned)free_iram);
     if (n <= 0) {
         return;
     }
@@ -656,8 +668,8 @@ esp_err_t system_log_init(void)
     s_init = true;
     s_orig_vprintf = esp_log_set_vprintf(system_log_vprintf);
 
-    BaseType_t ok = xTaskCreatePinnedToCore(system_log_task, TAG, SYSTEM_LOG_TASK_STACK,
-                                            NULL, SYSTEM_LOG_TASK_PRIO, &s_task, 0);
+    BaseType_t ok = app_task_create_pinned(system_log_task, TAG, SYSTEM_LOG_TASK_STACK,
+                                           NULL, SYSTEM_LOG_TASK_PRIO, &s_task, 0);
     if (ok != pdPASS) {
         s_task = NULL;
         ESP_LOGW(TAG, "log task create failed; ring will drop oldest lines");
@@ -749,24 +761,23 @@ esp_err_t system_log_clear(void)
     return ESP_OK;
 }
 
-void system_log_write(const char *tag, const char *fmt, ...)
+static void system_log_write_level(char level, const char *tag, const char *fmt, va_list ap)
 {
     if (fmt == NULL) {
         return;
     }
 
     char body[SYSTEM_LOG_LINE_MAX];
-    va_list ap;
-    va_start(ap, fmt);
     int n = vsnprintf(body, sizeof(body), fmt, ap);
-    va_end(ap);
     if (n <= 0) {
         return;
     }
 
     char out[SYSTEM_LOG_LINE_MAX + SYSTEM_LOG_TAG_MAX + 8];
-    int m = snprintf(out, sizeof(out), "E %s: %s\n",
-                     (tag != NULL && tag[0] != '\0') ? tag : "sys", body);
+    int m = snprintf(out, sizeof(out), "%c %s: %s\n",
+                     level,
+                     (tag != NULL && tag[0] != '\0') ? tag : "sys",
+                     body);
     if (m <= 0) {
         return;
     }
@@ -775,4 +786,20 @@ void system_log_write(const char *tag, const char *fmt, ...)
         len = sizeof(out) - 1U;
     }
     ring_push(&s_ring, (const uint8_t *)out, len);
+}
+
+void system_log_write(const char *tag, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    system_log_write_level('E', tag, fmt, ap);
+    va_end(ap);
+}
+
+void system_log_write_info(const char *tag, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    system_log_write_level('I', tag, fmt, ap);
+    va_end(ap);
 }

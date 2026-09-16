@@ -26,6 +26,7 @@
 #include "freertos/task.h"
 
 #include "app_config.h"
+#include "diag/boot_guard.h"
 #include "ui/ui_ota_progress.h"
 #include "util/log_tags.h"
 
@@ -596,6 +597,22 @@ static esp_err_t ota_send_status_json(httpd_req_t *req)
     cJSON_AddStringToObject(root, "running_partition", running != NULL ? running->label : "");
     cJSON_AddNumberToObject(root, "slot_size", next != NULL ? (double)next->size : 0.0);
     cJSON_AddNumberToObject(root, "updated_ms", (double)status.updated_ms);
+
+    boot_guard_info_t boot = {0};
+    boot_guard_get_info(&boot);
+#if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
+    cJSON_AddBoolToObject(root, "rollback_supported", true);
+#else
+    cJSON_AddBoolToObject(root, "rollback_supported", false);
+#endif
+    cJSON_AddStringToObject(root,
+                            "app_state",
+                            boot.ota_state_err == ESP_OK ? boot_guard_ota_state_str(boot.ota_state)
+                                                         : esp_err_to_name(boot.ota_state_err));
+    cJSON_AddBoolToObject(root, "rollback_pending", boot.rollback_pending);
+    cJSON_AddBoolToObject(root, "boot_confirmed", boot.confirmed);
+    cJSON_AddNumberToObject(root, "boot_count", (double)boot.boot_count);
+    cJSON_AddStringToObject(root, "reset_reason", boot_guard_reset_reason_str(boot.reset_reason));
 
     char *payload = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);

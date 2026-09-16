@@ -14,6 +14,7 @@
 #include "ui/fonts/app_text_fonts.h"
 #include "ui/ui_i18n.h"
 #include "ui/ui_memory.h"
+#include "ui/ui_value_anim.h"
 #include "ui/theme/theme_default.h"
 
 #if LV_FONT_MONTSERRAT_24
@@ -209,7 +210,7 @@ static void sensor_set_value_text(w_sensor_ctx_t *ctx, const char *text)
     if (ctx == NULL || ctx->value_label == NULL) {
         return;
     }
-    lv_label_set_text(ctx->value_label, (text != NULL && text[0] != '\0') ? text : "--");
+    ui_value_anim_set_text(ctx->value_label, (text != NULL && text[0] != '\0') ? text : "--");
 }
 
 static void sensor_update_age_label(w_sensor_ctx_t *ctx)
@@ -382,16 +383,19 @@ esp_err_t w_sensor_create(const ui_widget_def_t *def, lv_obj_t *parent, ui_widge
     lv_obj_set_style_pad_bottom(card, 10, LV_PART_MAIN);
 
     lv_obj_t *title = lv_label_create(card);
+    lv_obj_add_flag(title, LV_OBJ_FLAG_USER_1);
     lv_label_set_text(title, def->title[0] ? def->title : def->id);
     lv_obj_set_style_text_color(title, theme_default_color_text_muted(), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, APP_FONT_TEXT_20, LV_PART_MAIN);
 
     lv_obj_t *value = lv_label_create(card);
+    lv_obj_add_flag(value, LV_OBJ_FLAG_USER_3);
     lv_label_set_text(value, "--");
     lv_obj_set_style_text_color(value, theme_default_color_text_primary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(value, SENSOR_VALUE_FONT_MEDIUM, LV_PART_MAIN);
 
     lv_obj_t *age = lv_label_create(card);
+    lv_obj_add_flag(age, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(age, ui_i18n_get("sensor.age.just_now", "just now"));
     lv_obj_set_style_text_color(age, theme_default_color_text_muted(), LV_PART_MAIN);
     lv_obj_set_style_text_font(age, SENSOR_META_FONT, LV_PART_MAIN);

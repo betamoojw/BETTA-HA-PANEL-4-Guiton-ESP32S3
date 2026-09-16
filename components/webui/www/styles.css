@@ -169,6 +169,12 @@ body {
   display: none !important;
 }
 
+/* Colour pickers stay visible while "own colours" is off, just dimmed, so the
+ * options can always be found instead of hiding behind the switch. */
+.grid-dimmed {
+  opacity: 0.45;
+}
+
 section {
   margin-top: 16px;
   background: rgba(255, 255, 255, 0.03);
@@ -357,6 +363,119 @@ textarea {
   color: #ff8f94;
 }
 
+/* microSD browser: one row per entry, name on the left, actions on the right. */
+.sd-file-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sd-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid #27415a;
+  border-radius: 8px;
+  background: #16283a;
+}
+
+.sd-file-icon {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sd-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sd-file-name:hover {
+  background: #22384d;
+}
+
+.sd-file-size {
+  flex: 0 0 auto;
+  min-height: 0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.press-fx-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+
+.press-fx-preview-tile {
+  width: 132px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #1f4f78, #16283c);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e8f1fa;
+  font-size: 13px;
+  text-align: center;
+  user-select: none;
+  cursor: pointer;
+  transition: opacity 90ms ease-out, transform 90ms ease-out;
+}
+
+.press-fx-preview-tile.is-pressed {
+  opacity: var(--press-fx-opa, 1);
+  transform: scale(var(--press-fx-scale, 1));
+}
+
+.anim-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.anim-preview-value {
+  min-width: 92px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: #16283c;
+  color: #e8f3ff;
+  font: 600 18px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
+
+.anim-preview-value.is-fading {
+  animation: value-anim-fade var(--value-anim-ms, 320ms) ease-out;
+}
+
+.anim-preview-value.is-sliding {
+  animation: value-anim-slide var(--value-anim-ms, 320ms) ease-out;
+}
+
+@keyframes value-anim-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes value-anim-slide {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .ota-progress {
   width: 100%;
   height: 8px;
@@ -396,6 +515,68 @@ textarea {
   min-height: 18px;
   border-left: 2px solid transparent;
   padding-left: 6px;
+}
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.diag-card {
+  border: 1px solid #2a4356;
+  border-radius: 8px;
+  background: #101f2b;
+  padding: 8px 10px;
+}
+
+.diag-card h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8fb6d1;
+}
+
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.diag-row .diag-key {
+  color: #8fb6d1;
+}
+
+.diag-row .diag-value {
+  color: #e6f0f7;
+  font-family: "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+  text-align: right;
+  word-break: break-all;
+}
+
+.diag-value.diag-ok {
+  color: #7ee0a8;
+}
+
+.diag-value.diag-warn {
+  color: #ffc563;
+}
+
+.diag-value.diag-bad {
+  color: #ff8b93;
+}
+
+.diag-note {
+  margin: 8px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed #2a4356;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #ffc563;
 }
 
 .log-line.log-E {
@@ -441,7 +622,8 @@ textarea {
 }
 
 .energy-page-options,
-.music-page-options {
+.music-page-options,
+.page-look-options {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #2f4960;
@@ -1657,4 +1839,20 @@ aside.actions-panel section {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.inspector-group-body .tile-color-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inspector-group-body .tile-color-inputs input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.inspector-group-body .tile-color-inputs input[type="color"] {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 30px;
+  padding: 2px;
+  cursor: pointer;
 }

@@ -18,6 +18,7 @@
 #include "ui/theme/theme_default.h"
 #include "ui/ui_bindings.h"
 #include "ui/ui_memory.h"
+#include "ui/ui_slider_touch.h"
 
 #define TAG "ui_music"
 
@@ -1583,8 +1584,9 @@ esp_err_t ui_music_page_create(
     lv_obj_set_size(root, APP_CONTENT_BOX_WIDTH, APP_CONTENT_BOX_HEIGHT);
     lv_obj_set_pos(root, 0, 0);
     lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(root, lv_color_hex(APP_UI_COLOR_CONTENT_BG), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(root, LV_OPA_COVER, LV_PART_MAIN);
+    /* Transparent on purpose: the page container painted by ui_page_style owns
+     * the background, so a page colour/gradient/wallpaper shows through. */
+    lv_obj_set_style_bg_opa(root, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(root, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(root, 0, LV_PART_MAIN);
     ctx->root = root;
@@ -1790,6 +1792,7 @@ esp_err_t ui_music_page_create(
     lv_obj_add_event_cb(ctx->vol_slider, mp_volume_event, LV_EVENT_PRESSED, ctx);
     lv_obj_add_event_cb(ctx->vol_slider, mp_volume_event, LV_EVENT_RELEASED, ctx);
     lv_obj_add_event_cb(ctx->vol_slider, mp_volume_event, LV_EVENT_PRESS_LOST, ctx);
+    ui_slider_touch_enable(ctx->vol_slider);
 
     s_live_music_ctx = ctx;
     mp_lib_create(ctx);

@@ -78,6 +78,17 @@ static uint8_t s_pending_reconnect_reason = 0;
 static int s_pending_reconnect_attempt = 0;
 static int s_wifi_scan_last_status = 0;
 
+/* Link statistics exposed through /api/diagnostics. Written from the Wi-Fi
+ * event handler (the ESP event task) and the reconnect timer, so only plain
+ * word-sized fields that tolerate benign races are kept here. */
+static uint32_t s_wifi_connect_count = 0;
+static uint32_t s_wifi_disconnect_count = 0;
+static uint16_t s_wifi_reconnect_count = 0;
+static uint16_t s_wifi_recover_count = 0;
+static uint8_t s_wifi_last_disconnect_reason = 0;
+static int64_t s_wifi_last_connect_ms = 0;
+static int64_t s_wifi_last_session_ms = 0;
+
 static esp_err_t wifi_mgr_force_reconnect_internal(bool allow_transport_escalation);
 
 static void wifi_mgr_reset_reconnect_state(void)
@@ -311,6 +322,9 @@ static int64_t wifi_mgr_schedule_reconnect(uint8_t reason, int attempt_no)
     int64_t delay_ms = wifi_mgr_compute_reconnect_delay_ms(reason, attempt_no);
     s_pending_reconnect_reason = reason;
     s_pending_reconnect_attempt = attempt_no;
+    if (s_wifi_reconnect_count < UINT16_MAX) {
+        s_wifi_reconnect_count++;
+    }
 
     if (s_reconnect_timer == NULL) {
         const esp_timer_create_args_t timer_args = {
@@ -450,6 +464,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         wifi_event_sta_disconnected_t *disc = (wifi_event_sta_disconnected_t *)event_data;
         uint8_t reason = (disc != NULL) ? (uint8_t)disc->reason : 0;
         s_wifi_connected = false;
+        s_wifi_last_disconnect_reason = reason;
+        if (s_wifi_disconnect_count < UINT32_MAX) {
+            s_wifi_disconnect_count++;
+        }
         if (disc != NULL) {
             ESP_LOGW(TAG_WIFI, "Wi-Fi disconnected, reason=%d (%s)",
                 (int)disc->reason, wifi_reason_to_str((uint8_t)disc->reason));
@@ -486,6 +504,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         s_last_recover_disc_conn_ms = 0;
         s_last_recover_stop_start_ms = 0;
         wifi_mgr_reset_reconnect_state();
+        if (s_wifi_last_connect_ms > 0) {
+            s_wifi_last_session_ms = esp_timer_get_time() / 1000 - s_wifi_last_connect_ms;
+        }
+        s_wifi_last_connect_ms = esp_timer_get_time() / 1000;
+        if (s_wifi_connect_count < UINT32_MAX) {
+            s_wifi_connect_count++;
+        }
 #if APP_WIFI_DISABLE_POWER_SAVE
         esp_err_t ps_err = esp_wifi_set_ps(WIFI_PS_NONE);
         if (ps_err != ESP_OK) {
@@ -1160,6 +1185,9 @@ static esp_err_t wifi_mgr_force_reconnect_internal(bool allow_transport_escalati
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (s_wifi_recover_count < UINT16_MAX) {
+        s_wifi_recover_count++;
+    }
     s_wifi_connected = false;
     s_last_connect_request_ms = 0;
     wifi_mgr_reset_reconnect_state();
@@ -1391,6 +1419,21 @@ esp_err_t wifi_mgr_get_sta_rssi(int8_t *out_rssi_dbm)
     *out_rssi_dbm = ap_info.rssi;
     return ESP_OK;
 #endif
+}
+
+esp_err_t wifi_mgr_get_link_stats(wifi_mgr_link_stats_t *out_stats)
+{
+    if (out_stats == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    out_stats->connect_count = s_wifi_connect_count;
+    out_stats->disconnect_count = s_wifi_disconnect_count;
+    out_stats->reconnect_count = s_wifi_reconnect_count;
+    out_stats->hard_recover_count = s_wifi_recover_count;
+    out_stats->last_disconnect_reason = s_wifi_last_disconnect_reason;
+    out_stats->last_connect_uptime_ms = s_wifi_last_connect_ms;
+    out_stats->last_session_ms = s_wifi_last_session_ms;
+    return ESP_OK;
 }
 
 esp_err_t wifi_mgr_scan(wifi_mgr_scan_result_t *results, size_t max_results, size_t *out_count)

@@ -23,9 +23,25 @@
 #include "net/wifi_mgr.h"
 #include "settings/i18n_store.h"
 #include "settings/runtime_settings.h"
+#include "ui/ui_page_transition.h"
+#include "ui/ui_pages.h"
+#include "ui/ui_press_feedback.h"
 #include "ui/ui_screen_saver.h"
+#include "ui/ui_theme_router.h"
+#include "ui/ui_value_anim.h"
 
 static esp_timer_handle_t s_restart_timer = NULL;
+
+static int clamp_int(int value, int lo, int hi)
+{
+    if (value < lo) {
+        return lo;
+    }
+    if (value > hi) {
+        return hi;
+    }
+    return value;
+}
 
 static void set_json_headers(httpd_req_t *req)
 {
@@ -283,6 +299,7 @@ esp_err_t api_settings_get_handler(httpd_req_t *req)
     cJSON_AddItemToObject(root, "ui", ui);
 
     cJSON_AddNumberToObject(display, "brightness", settings->display_brightness);
+    cJSON_AddNumberToObject(display, "saver_brightness", settings->display_saver_brightness);
     cJSON_AddBoolToObject(display, "screensaver_enabled", settings->display_screensaver_enabled);
     cJSON_AddNumberToObject(display, "screensaver_timeout_sec", (double)settings->display_screensaver_timeout_sec);
     cJSON_AddBoolToObject(display, "screen_off_enabled", settings->display_screen_off_enabled);
@@ -290,11 +307,52 @@ esp_err_t api_settings_get_handler(httpd_req_t *req)
     cJSON_AddBoolToObject(display, "clock_24h", settings->display_clock_24h);
     cJSON_AddBoolToObject(display, "saver_show_seconds", settings->display_saver_show_seconds);
     cJSON_AddBoolToObject(display, "saver_show_date", settings->display_saver_show_date);
+    cJSON_AddNumberToObject(display, "saver_clock_style", (double)settings->display_saver_clock_style);
     cJSON_AddNumberToObject(display, "saver_clock_color", (double)(settings->display_saver_clock_color & 0xFFFFFF));
     cJSON_AddNumberToObject(display, "saver_date_color", (double)(settings->display_saver_date_color & 0xFFFFFF));
+    cJSON_AddBoolToObject(display, "night_mode_enabled", settings->display_night_mode_enabled);
+    cJSON_AddNumberToObject(display, "night_start_min", (double)settings->display_night_start_min);
+    cJSON_AddNumberToObject(display, "night_end_min", (double)settings->display_night_end_min);
+    cJSON_AddNumberToObject(display, "night_brightness", (double)settings->display_night_brightness);
+    cJSON_AddNumberToObject(display, "night_wake_sec", (double)settings->display_night_wake_sec);
+    cJSON_AddBoolToObject(display, "theme_auto_enabled", settings->display_theme_auto_enabled);
+    cJSON_AddStringToObject(display, "theme_day_id", settings->display_theme_day_id);
+    cJSON_AddStringToObject(display, "theme_night_id", settings->display_theme_night_id);
+    cJSON_AddStringToObject(display, "page_transition", settings->display_page_transition);
+    cJSON_AddNumberToObject(display, "page_transition_ms", (double)settings->display_page_transition_ms);
+    cJSON_AddStringToObject(display, "tile_press_fx", settings->display_tile_press_fx);
+    cJSON_AddNumberToObject(display, "tile_press_fx_dim", (double)settings->display_tile_press_fx_dim);
+    cJSON_AddNumberToObject(display, "tile_press_fx_scale", (double)settings->display_tile_press_fx_scale);
+    cJSON_AddStringToObject(display, "value_anim", settings->display_value_anim);
+    cJSON_AddNumberToObject(display, "value_anim_ms", (double)settings->display_value_anim_ms);
+    cJSON_AddBoolToObject(display, "topbar_show_clock", settings->display_topbar_show_clock);
+    cJSON_AddBoolToObject(display, "topbar_show_date", settings->display_topbar_show_date);
+    cJSON_AddBoolToObject(display, "topbar_show_gear", settings->display_topbar_show_gear);
+    cJSON_AddBoolToObject(display, "topbar_show_status", settings->display_topbar_show_status);
+    cJSON_AddBoolToObject(display, "topbar_icon_text", settings->display_topbar_icon_text);
+    cJSON_AddBoolToObject(display, "topbar_custom_colors", settings->display_topbar_custom_colors);
+    cJSON_AddNumberToObject(display, "topbar_bg_color", (double)(settings->display_topbar_bg_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "topbar_clock_color", (double)(settings->display_topbar_clock_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "topbar_date_color", (double)(settings->display_topbar_date_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "topbar_gear_color", (double)(settings->display_topbar_gear_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "topbar_ha_color", (double)(settings->display_topbar_ha_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "topbar_wifi_color", (double)(settings->display_topbar_wifi_color & 0xFFFFFF));
+    cJSON_AddBoolToObject(display, "nav_custom_colors", settings->display_nav_custom_colors);
+    cJSON_AddNumberToObject(display, "nav_bar_bg_color", (double)(settings->display_nav_bar_bg_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "nav_bar_border_color", (double)(settings->display_nav_bar_border_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "nav_button_bg_color", (double)(settings->display_nav_button_bg_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(
+        display, "nav_button_border_color", (double)(settings->display_nav_button_border_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "nav_tab_idle_color", (double)(settings->display_nav_tab_idle_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "nav_tab_active_color", (double)(settings->display_nav_tab_active_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(display, "nav_home_idle_color", (double)(settings->display_nav_home_idle_color & 0xFFFFFF));
+    cJSON_AddNumberToObject(
+        display, "nav_home_active_color", (double)(settings->display_nav_home_active_color & 0xFFFFFF));
+    cJSON_AddBoolToObject(display, "night_active", ui_screen_saver_night_active());
     cJSON_AddItemToObject(root, "display", display);
 
     cJSON_AddBoolToObject(mqtt, "enabled", settings->mqtt_enabled);
+    cJSON_AddBoolToObject(mqtt, "use_tls", settings->mqtt_use_tls);
     cJSON_AddStringToObject(mqtt, "host", settings->mqtt_host);
     cJSON_AddNumberToObject(mqtt, "port", (double)settings->mqtt_port);
     cJSON_AddStringToObject(mqtt, "username", settings->mqtt_username);
@@ -532,6 +590,21 @@ esp_err_t api_settings_put_handler(httpd_req_t *req)
             }
         }
 
+        cJSON *saver_brightness = cJSON_GetObjectItemCaseSensitive(display, "saver_brightness");
+        if (saver_brightness != NULL) {
+            if (cJSON_IsNumber(saver_brightness)) {
+                int value = (int)saver_brightness->valuedouble;
+                if (value < 1) {
+                    value = 1;
+                } else if (value > 100) {
+                    value = 100;
+                }
+                settings->display_saver_brightness = (uint8_t)value;
+            } else {
+                invalid_type = true;
+            }
+        }
+
         cJSON *saver_timeout = cJSON_GetObjectItemCaseSensitive(display, "screensaver_timeout_sec");
         if (saver_timeout != NULL) {
             if (cJSON_IsNumber(saver_timeout)) {
@@ -567,11 +640,174 @@ esp_err_t api_settings_put_handler(httpd_req_t *req)
         (void)update_bool_setting(display, "clock_24h", &settings->display_clock_24h, &invalid_type);
         (void)update_bool_setting(display, "saver_show_seconds", &settings->display_saver_show_seconds, &invalid_type);
         (void)update_bool_setting(display, "saver_show_date", &settings->display_saver_show_date, &invalid_type);
+
+        cJSON *saver_clock_style = cJSON_GetObjectItemCaseSensitive(display, "saver_clock_style");
+        if (saver_clock_style != NULL) {
+            if (cJSON_IsNumber(saver_clock_style)) {
+                settings->display_saver_clock_style = (uint8_t)clamp_int(
+                    (int)saver_clock_style->valuedouble, APP_DISPLAY_SAVER_CLOCK_STYLE_CLASSIC,
+                    APP_DISPLAY_SAVER_CLOCK_STYLE_FLIP);
+            } else {
+                invalid_type = true;
+            }
+        }
         (void)update_color_setting(display, "saver_clock_color", &settings->display_saver_clock_color, &invalid_type);
         (void)update_color_setting(display, "saver_date_color", &settings->display_saver_date_color, &invalid_type);
+        (void)update_bool_setting(display, "night_mode_enabled", &settings->display_night_mode_enabled, &invalid_type);
+
+        cJSON *night_start = cJSON_GetObjectItemCaseSensitive(display, "night_start_min");
+        if (night_start != NULL) {
+            if (cJSON_IsNumber(night_start)) {
+                int value = (int)night_start->valuedouble;
+                settings->display_night_start_min = (uint16_t)clamp_int(value, 0, 1439);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *night_end = cJSON_GetObjectItemCaseSensitive(display, "night_end_min");
+        if (night_end != NULL) {
+            if (cJSON_IsNumber(night_end)) {
+                int value = (int)night_end->valuedouble;
+                settings->display_night_end_min = (uint16_t)clamp_int(value, 0, 1439);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *night_brightness = cJSON_GetObjectItemCaseSensitive(display, "night_brightness");
+        if (night_brightness != NULL) {
+            if (cJSON_IsNumber(night_brightness)) {
+                int value = (int)night_brightness->valuedouble;
+                settings->display_night_brightness = (uint8_t)clamp_int(value, 0, 100);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *night_wake = cJSON_GetObjectItemCaseSensitive(display, "night_wake_sec");
+        if (night_wake != NULL) {
+            if (cJSON_IsNumber(night_wake)) {
+                int value = (int)night_wake->valuedouble;
+                settings->display_night_wake_sec = (uint16_t)clamp_int(value, 0, 3600);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *theme_auto = cJSON_GetObjectItemCaseSensitive(display, "theme_auto_enabled");
+        if (theme_auto != NULL) {
+            if (cJSON_IsBool(theme_auto)) {
+                settings->display_theme_auto_enabled = cJSON_IsTrue(theme_auto);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *theme_day = cJSON_GetObjectItemCaseSensitive(display, "theme_day_id");
+        if (theme_day != NULL) {
+            if (cJSON_IsString(theme_day) && theme_day->valuestring != NULL &&
+                strlen(theme_day->valuestring) < sizeof(settings->display_theme_day_id)) {
+                snprintf(settings->display_theme_day_id, sizeof(settings->display_theme_day_id), "%s",
+                         theme_day->valuestring);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *theme_night = cJSON_GetObjectItemCaseSensitive(display, "theme_night_id");
+        if (theme_night != NULL) {
+            if (cJSON_IsString(theme_night) && theme_night->valuestring != NULL &&
+                strlen(theme_night->valuestring) < sizeof(settings->display_theme_night_id)) {
+                snprintf(settings->display_theme_night_id, sizeof(settings->display_theme_night_id), "%s",
+                         theme_night->valuestring);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        (void)update_string_setting(display, "page_transition", settings->display_page_transition,
+                                    sizeof(settings->display_page_transition), &invalid_type, &too_long);
+
+        cJSON *transition_ms = cJSON_GetObjectItemCaseSensitive(display, "page_transition_ms");
+        if (transition_ms != NULL) {
+            if (cJSON_IsNumber(transition_ms)) {
+                int value = (int)transition_ms->valuedouble;
+                settings->display_page_transition_ms =
+                    (uint16_t)clamp_int(value, 0, APP_DISPLAY_PAGE_TRANSITION_MAX_MS);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        (void)update_string_setting(display, "tile_press_fx", settings->display_tile_press_fx,
+                                    sizeof(settings->display_tile_press_fx), &invalid_type, &too_long);
+
+        cJSON *press_fx_dim = cJSON_GetObjectItemCaseSensitive(display, "tile_press_fx_dim");
+        if (press_fx_dim != NULL) {
+            if (cJSON_IsNumber(press_fx_dim)) {
+                int value = (int)press_fx_dim->valuedouble;
+                settings->display_tile_press_fx_dim = (uint8_t)clamp_int(value, 0, APP_TILE_PRESS_FX_DIM_MAX);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        cJSON *press_fx_scale = cJSON_GetObjectItemCaseSensitive(display, "tile_press_fx_scale");
+        if (press_fx_scale != NULL) {
+            if (cJSON_IsNumber(press_fx_scale)) {
+                int value = (int)press_fx_scale->valuedouble;
+                settings->display_tile_press_fx_scale =
+                    (uint8_t)clamp_int(value, APP_TILE_PRESS_FX_SCALE_MIN, APP_TILE_PRESS_FX_SCALE_MAX);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        (void)update_string_setting(display, "value_anim", settings->display_value_anim,
+                                    sizeof(settings->display_value_anim), &invalid_type, &too_long);
+
+        cJSON *value_anim_ms = cJSON_GetObjectItemCaseSensitive(display, "value_anim_ms");
+        if (value_anim_ms != NULL) {
+            if (cJSON_IsNumber(value_anim_ms)) {
+                int value = (int)value_anim_ms->valuedouble;
+                settings->display_value_anim_ms =
+                    (uint16_t)clamp_int(value, 0, APP_DISPLAY_VALUE_ANIM_MAX_MS);
+            } else {
+                invalid_type = true;
+            }
+        }
+
+        (void)update_bool_setting(display, "topbar_show_clock", &settings->display_topbar_show_clock, &invalid_type);
+        (void)update_bool_setting(display, "topbar_show_date", &settings->display_topbar_show_date, &invalid_type);
+        (void)update_bool_setting(display, "topbar_show_gear", &settings->display_topbar_show_gear, &invalid_type);
+        (void)update_bool_setting(display, "topbar_show_status", &settings->display_topbar_show_status, &invalid_type);
+        (void)update_bool_setting(display, "topbar_icon_text", &settings->display_topbar_icon_text, &invalid_type);
+        (void)update_bool_setting(
+            display, "topbar_custom_colors", &settings->display_topbar_custom_colors, &invalid_type);
+        (void)update_color_setting(display, "topbar_bg_color", &settings->display_topbar_bg_color, &invalid_type);
+        (void)update_color_setting(display, "topbar_clock_color", &settings->display_topbar_clock_color, &invalid_type);
+        (void)update_color_setting(display, "topbar_date_color", &settings->display_topbar_date_color, &invalid_type);
+        (void)update_color_setting(display, "topbar_gear_color", &settings->display_topbar_gear_color, &invalid_type);
+        (void)update_color_setting(display, "topbar_ha_color", &settings->display_topbar_ha_color, &invalid_type);
+        (void)update_color_setting(display, "topbar_wifi_color", &settings->display_topbar_wifi_color, &invalid_type);
+        (void)update_bool_setting(display, "nav_custom_colors", &settings->display_nav_custom_colors, &invalid_type);
+        (void)update_color_setting(display, "nav_bar_bg_color", &settings->display_nav_bar_bg_color, &invalid_type);
+        (void)update_color_setting(
+            display, "nav_bar_border_color", &settings->display_nav_bar_border_color, &invalid_type);
+        (void)update_color_setting(display, "nav_button_bg_color", &settings->display_nav_button_bg_color, &invalid_type);
+        (void)update_color_setting(
+            display, "nav_button_border_color", &settings->display_nav_button_border_color, &invalid_type);
+        (void)update_color_setting(display, "nav_tab_idle_color", &settings->display_nav_tab_idle_color, &invalid_type);
+        (void)update_color_setting(
+            display, "nav_tab_active_color", &settings->display_nav_tab_active_color, &invalid_type);
+        (void)update_color_setting(display, "nav_home_idle_color", &settings->display_nav_home_idle_color, &invalid_type);
+        (void)update_color_setting(
+            display, "nav_home_active_color", &settings->display_nav_home_active_color, &invalid_type);
     }
     if (cJSON_IsObject(mqtt)) {
         (void)update_bool_setting(mqtt, "enabled", &settings->mqtt_enabled, &invalid_type);
+        (void)update_bool_setting(mqtt, "use_tls", &settings->mqtt_use_tls, &invalid_type);
         (void)update_string_setting(
             mqtt, "host", settings->mqtt_host, sizeof(settings->mqtt_host), &invalid_type, &too_long);
         (void)update_string_setting(
@@ -727,11 +963,56 @@ esp_err_t api_settings_put_handler(httpd_req_t *req)
         free(settings);
         return send_json_error(req, "400 Bad Request", "ui.language must use [a-z0-9_-] and be 2-15 chars");
     }
+    {
+        char transition[APP_DISPLAY_PAGE_TRANSITION_MAX_LEN] = {0};
+        if (!runtime_settings_page_transition_from_string(settings->display_page_transition, transition,
+                                                          sizeof(transition))) {
+            free(settings);
+            return send_json_error(req, "400 Bad Request",
+                                   "display.page_transition must be one of none, fade, slide, slide_up, fade_slide");
+        }
+        strlcpy(settings->display_page_transition, transition, sizeof(settings->display_page_transition));
+        settings->display_page_transition_ms =
+            (uint16_t)clamp_int(settings->display_page_transition_ms, 0, APP_DISPLAY_PAGE_TRANSITION_MAX_MS);
+    }
+    {
+        char press_fx[APP_TILE_PRESS_FX_MAX_LEN] = {0};
+        if (!runtime_settings_tile_press_fx_from_string(settings->display_tile_press_fx, press_fx,
+                                                       sizeof(press_fx))) {
+            free(settings);
+            return send_json_error(req, "400 Bad Request",
+                                   "display.tile_press_fx must be one of none, dim, scale, both");
+        }
+        strlcpy(settings->display_tile_press_fx, press_fx, sizeof(settings->display_tile_press_fx));
+        settings->display_tile_press_fx_dim =
+            (uint8_t)clamp_int(settings->display_tile_press_fx_dim, 0, APP_TILE_PRESS_FX_DIM_MAX);
+        settings->display_tile_press_fx_scale =
+            (uint8_t)clamp_int(settings->display_tile_press_fx_scale, APP_TILE_PRESS_FX_SCALE_MIN,
+                               APP_TILE_PRESS_FX_SCALE_MAX);
+    }
+    {
+        char value_anim[APP_DISPLAY_VALUE_ANIM_MAX_LEN] = {0};
+        if (!runtime_settings_value_anim_from_string(settings->display_value_anim, value_anim,
+                                                     sizeof(value_anim))) {
+            free(settings);
+            return send_json_error(req, "400 Bad Request",
+                                   "display.value_anim must be one of none, fade, slide, count");
+        }
+        strlcpy(settings->display_value_anim, value_anim, sizeof(settings->display_value_anim));
+        settings->display_value_anim_ms =
+            (uint16_t)clamp_int(settings->display_value_anim_ms, 0, APP_DISPLAY_VALUE_ANIM_MAX_MS);
+    }
 
     esp_err_t save_err = runtime_settings_save(settings);
     if (save_err == ESP_OK && !reboot) {
         /* Apply display settings immediately without a reboot. */
         ui_screen_saver_apply_settings(settings);
+        ui_page_transition_apply_settings(settings);
+        ui_press_feedback_apply_settings(settings);
+        ui_value_anim_apply_settings(settings);
+        ui_pages_apply_topbar_settings(settings);
+        ui_pages_apply_bottom_bar_settings(settings);
+        ui_theme_router_apply_settings(settings);
         /* (Re)configure native MQTT + HA discovery without a reboot. */
         panel_mqtt_notify_settings_changed();
     }
@@ -794,7 +1075,13 @@ esp_err_t api_display_wallpaper_post_handler(httpd_req_t *req)
         return send_json_error(req, "400 Bad Request", msg);
     }
 
-    FILE *f = fopen(APP_WALLPAPER_TMP_PATH, "wb");
+    /* Uploads always land in the store that is active right now: the card while
+     * one is mounted, internal flash otherwise. */
+    const char *tmp_path = ui_screen_saver_wallpaper_tmp_path();
+    const char *dst_path = ui_screen_saver_wallpaper_path();
+    const bool dst_on_card = ui_screen_saver_wallpaper_on_card();
+
+    FILE *f = fopen(tmp_path, "wb");
     if (f == NULL) {
         return send_json_error(req, "500 Internal Server Error", "Failed to open wallpaper file");
     }
@@ -802,7 +1089,7 @@ esp_err_t api_display_wallpaper_post_handler(httpd_req_t *req)
     uint8_t *buf = (uint8_t *)heap_caps_malloc(WALLPAPER_UPLOAD_CHUNK, MALLOC_CAP_8BIT);
     if (buf == NULL) {
         fclose(f);
-        remove(APP_WALLPAPER_TMP_PATH);
+        remove(tmp_path);
         return httpd_resp_send_500(req);
     }
 
@@ -829,14 +1116,18 @@ esp_err_t api_display_wallpaper_post_handler(httpd_req_t *req)
     fclose(f);
 
     if (!ok || received != req->content_len) {
-        remove(APP_WALLPAPER_TMP_PATH);
+        remove(tmp_path);
         return send_json_error(req, "400 Bad Request", "Wallpaper upload aborted");
     }
 
-    if (rename(APP_WALLPAPER_TMP_PATH, APP_WALLPAPER_PATH) != 0) {
-        remove(APP_WALLPAPER_TMP_PATH);
+    if (rename(tmp_path, dst_path) != 0) {
+        remove(tmp_path);
         return send_json_error(req, "500 Internal Server Error", "Failed to store wallpaper");
     }
+
+    /* One copy only: a leftover copy in the other store would come back the
+     * moment the card is pulled or inserted. */
+    remove(dst_on_card ? APP_WALLPAPER_PATH : APP_SD_WALLPAPER_PATH);
 
     ui_screen_saver_reload_wallpaper();
     display_note_activity();
@@ -858,9 +1149,54 @@ esp_err_t api_display_wallpaper_post_handler(httpd_req_t *req)
     return err;
 }
 
+esp_err_t api_display_wallpaper_get_handler(httpd_req_t *req)
+{
+    /* The frame normally sits on the card, but a card inserted a moment ago may
+     * not hold it yet, so the other store is tried before giving up. */
+    FILE *f = fopen(ui_screen_saver_wallpaper_path(), "rb");
+    if (f == NULL) {
+        f = fopen(ui_screen_saver_wallpaper_on_card() ? APP_WALLPAPER_PATH : APP_SD_WALLPAPER_PATH, "rb");
+    }
+    if (f == NULL) {
+        return send_json_error(req, "404 Not Found", "No wallpaper stored");
+    }
+
+    char *buf = (char *)heap_caps_malloc(WALLPAPER_UPLOAD_CHUNK, MALLOC_CAP_8BIT);
+    if (buf == NULL) {
+        fclose(f);
+        return httpd_resp_send_500(req);
+    }
+
+    /* Raw RGB565, little endian, row major: exactly what the panel stores, so
+     * the web editor can render a preview without any conversion. */
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=\"wallpaper.bin\"");
+
+    esp_err_t err = ESP_OK;
+    size_t read_bytes = 0;
+    while ((read_bytes = fread(buf, 1, WALLPAPER_UPLOAD_CHUNK, f)) > 0U) {
+        err = httpd_resp_send_chunk(req, buf, (ssize_t)read_bytes);
+        if (err != ESP_OK) {
+            break;
+        }
+    }
+    heap_caps_free(buf);
+    fclose(f);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+    return httpd_resp_send_chunk(req, NULL, 0);
+}
+
 esp_err_t api_display_wallpaper_delete_handler(httpd_req_t *req)
 {
+    /* Both stores are cleared, otherwise a card change would bring the deleted
+     * picture back. */
     remove(APP_WALLPAPER_PATH);
+    remove(APP_SD_WALLPAPER_PATH);
     ui_screen_saver_reload_wallpaper();
 
     cJSON *resp = cJSON_CreateObject();

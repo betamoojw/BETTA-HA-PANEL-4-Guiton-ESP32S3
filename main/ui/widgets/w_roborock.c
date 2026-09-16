@@ -2766,6 +2766,7 @@ esp_err_t w_roborock_create(const ui_widget_def_t *def, lv_obj_t *parent, ui_wid
     ctx->card = card;
 
     lv_obj_t *title = lv_label_create(card);
+    lv_obj_add_flag(title, LV_OBJ_FLAG_USER_1);
     lv_label_set_text(title, def->title[0] != '\0' ? def->title : def->entity_id);
     lv_obj_set_style_text_font(title, APP_FONT_TEXT_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(title, lv_color_hex(APP_UI_COLOR_TEXT_MUTED), LV_PART_MAIN);
@@ -2781,12 +2782,14 @@ esp_err_t w_roborock_create(const ui_widget_def_t *def, lv_obj_t *parent, ui_wid
     ctx->battery_chip = battery_chip;
 
     lv_obj_t *battery_label = lv_label_create(battery_chip);
+    lv_obj_add_flag(battery_label, LV_OBJ_FLAG_USER_3);
     lv_label_set_text(battery_label, "--");
     lv_obj_set_style_text_font(battery_label, APP_FONT_TEXT_14, LV_PART_MAIN);
     lv_obj_center(battery_label);
     ctx->battery_label = battery_label;
 
     lv_obj_t *state_label = lv_label_create(card);
+    lv_obj_add_flag(state_label, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(state_label, "");
     lv_obj_set_style_text_font(state_label, APP_FONT_TEXT_22, LV_PART_MAIN);
     lv_label_set_long_mode(state_label, LV_LABEL_LONG_DOT);
@@ -2795,6 +2798,7 @@ esp_err_t w_roborock_create(const ui_widget_def_t *def, lv_obj_t *parent, ui_wid
     ctx->state_label = state_label;
 
     lv_obj_t *detail_label = lv_label_create(card);
+    lv_obj_add_flag(detail_label, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(detail_label, "");
     lv_obj_set_style_text_font(detail_label, APP_FONT_TEXT_16, LV_PART_MAIN);
     lv_label_set_long_mode(detail_label, LV_LABEL_LONG_DOT);

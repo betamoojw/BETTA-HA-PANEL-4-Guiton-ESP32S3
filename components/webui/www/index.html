@@ -154,6 +154,55 @@
                 <button id="applyMusicPageBtn" class="btn" type="button">Apply music config</button>
               </div>
             </div>
+            <div id="pageLookOptions" class="page-look-options hidden">
+              <h2 id="pageLookHeading">Page look</h2>
+              <div class="meta" id="pageLookHint">Background of the whole page: solid color, gradient or the panel wallpaper.</div>
+              <label><span id="fPagePresetLabel">Preset</span>
+                <select id="fPagePreset">
+                  <option value="auto">Theme default</option>
+                  <option value="midnight">Midnight</option>
+                  <option value="deep_sea">Deep sea</option>
+                  <option value="forest">Forest</option>
+                  <option value="sunset">Sunset</option>
+                  <option value="plum">Plum</option>
+                  <option value="wallpaper">Wallpaper</option>
+                  <option value="wallpaper_dim">Wallpaper dimmed</option>
+                </select>
+              </label>
+              <label class="tile-color-row"><span id="fPageBgColorLabel">Background color</span>
+                <span class="tile-color-inputs">
+                  <input id="fPageBgColor" type="text" placeholder="#RRGGBB (panel)" maxlength="7" />
+                  <input id="fPageBgColorPick" type="color" value="#10202e" />
+                </span>
+              </label>
+              <label class="tile-color-row"><span id="fPageBgGradColorLabel">Gradient end color</span>
+                <span class="tile-color-inputs">
+                  <input id="fPageBgGradColor" type="text" placeholder="#RRGGBB (none)" maxlength="7" />
+                  <input id="fPageBgGradColorPick" type="color" value="#1b3a5c" />
+                </span>
+              </label>
+              <label><span id="fPageBgGradDirLabel">Gradient direction</span>
+                <select id="fPageBgGradDir">
+                  <option value="none">None</option>
+                  <option value="ver">Vertical</option>
+                  <option value="hor">Horizontal</option>
+                </select>
+              </label>
+              <label class="row">
+                <input id="fPageWallpaper" type="checkbox" />
+                <span id="fPageWallpaperLabel">Use panel wallpaper</span>
+              </label>
+              <label><span id="fPageDimLabel">Wallpaper dimming (%)</span>
+                <input id="fPageDim" type="number" min="0" max="90" step="5" placeholder="0" />
+              </label>
+              <label><span id="fPageThemeLabel">Theme override for this page</span>
+                <select id="fPageTheme">
+                  <option value="">Follow the global / day-night theme</option>
+                </select>
+              </label>
+              <div id="fPageThemeHint" class="meta">The page is repainted with the selected theme as soon as it is shown.</div>
+              <button id="pageLookResetBtn" class="btn small" type="button">Reset page look</button>
+            </div>
           </div>
           <div id="pagesMiniList" class="section-mini hidden"></div>
         </section>
@@ -174,6 +223,12 @@
                     <button class="dropdown-item" type="button" role="menuitem" data-add-target="addHeatingTileBtn">Heating Tile</button>
                     <button class="dropdown-item" type="button" role="menuitem" data-add-target="addMediaPlayerBtn">Media Player</button>
                     <button class="dropdown-item" type="button" role="menuitem" data-add-target="addRoborockTileBtn">Roborock</button>
+                    <button class="dropdown-item" type="button" role="menuitem" data-add-target="addAlarmTileBtn">Alarm Panel</button>
+                    <button class="dropdown-item" type="button" role="menuitem" data-add-target="addCoverTileBtn">Cover</button>
+                    <button class="dropdown-item" type="button" role="menuitem" data-add-target="addSceneTileBtn">Scene</button>
+                    <button class="dropdown-item" type="button" role="menuitem" data-add-target="addPersonTileBtn">Person</button>
+                    <button class="dropdown-item" type="button" role="menuitem" data-add-target="addTimerTileBtn">Timer</button>
+                    <button class="dropdown-item" type="button" role="menuitem" id="addClockMenuItem" data-add-target="addClockBtn">+ Clock</button>
                   </div>
                   <div class="dropdown-group">
                     <div class="dropdown-group-label">Data</div>
@@ -210,6 +265,12 @@
               <button id="addTodoListBtn" type="button">+ Todo List</button>
               <button id="addMediaPlayerBtn" type="button">+ Media Player</button>
               <button id="addRoborockTileBtn" type="button">+ Roborock</button>
+              <button id="addAlarmTileBtn" type="button">+ Alarm Panel</button>
+              <button id="addCoverTileBtn" type="button">+ Cover</button>
+              <button id="addSceneTileBtn" type="button">+ Scene</button>
+              <button id="addPersonTileBtn" type="button">+ Person</button>
+              <button id="addTimerTileBtn" type="button">+ Timer</button>
+              <button id="addClockBtn" type="button">+ Clock</button>
               <button id="deleteWidgetBtn" type="button">Delete Widget</button>
             </div>
             <ul id="widgetsList" class="list"></ul>
@@ -243,6 +304,8 @@
                     <option value="todo_list">todo_list</option>
                     <option value="media_player">media_player</option>
                     <option value="roborock_tile">roborock_tile</option>
+                    <option value="alarm_tile">alarm_tile</option>
+                    <option value="clock_alarm">clock_alarm</option>
                   </select>
                   <label id="fEntityWrap"><span id="fEntityLabel">Entity</span>
                     <input id="fEntity" type="text" list="entityOptions" />
@@ -367,12 +430,187 @@
                       <input id="fBinaryTextOff" type="text" placeholder="auto" />
                     </label>
                   </div>
+                  <div id="alarmOptions" class="slider-options hidden">
+                    <label><span id="fAlarmCodeLabel">PIN code (empty = no code)</span>
+                      <input id="fAlarmCode" type="text" maxlength="24" autocomplete="off" placeholder="1234" />
+                    </label>
+                    <label class="row">
+                      <input id="fAlarmAskCode" type="checkbox" />
+                      <span id="fAlarmAskCodeLabel">Ask for PIN on the panel</span>
+                    </label>
+                    <label><span id="fAlarmBackendLabel">Service backend</span>
+                      <select id="fAlarmBackend">
+                        <option value="auto">Auto (detect Alarmo)</option>
+                        <option value="alarmo">Alarmo (alarmo.arm / alarmo.disarm)</option>
+                        <option value="builtin">Home Assistant (alarm_control_panel)</option>
+                      </select>
+                    </label>
+                    <label><span id="fAlarmZoneLabelText">Zone caption (Alarmo area, empty = none)</span>
+                      <input id="fAlarmZoneLabel" type="text" maxlength="63" placeholder="Kuchnia" />
+                    </label>
+                    <label class="row">
+                      <input id="fAlarmShowSensors" type="checkbox" checked />
+                      <span id="fAlarmShowSensorsLabel">Show open sensors on the tile</span>
+                    </label>
+                    <label class="row">
+                      <input id="fAlarmShowBypassed" type="checkbox" checked />
+                      <span id="fAlarmShowBypassedLabel">Show bypassed sensor count</span>
+                    </label>
+                    <label class="row">
+                      <input id="fAlarmForceArm" type="checkbox" checked />
+                      <span id="fAlarmForceArmLabel">Ask to force arm when sensors are open</span>
+                    </label>
+                    <label class="row">
+                      <input id="fAlarmSkipDelay" type="checkbox" />
+                      <span id="fAlarmSkipDelayLabel">Skip exit delay (Alarmo)</span>
+                    </label>
+                    <div class="meta" id="fAlarmModesLabel">Buttons on the tile</div>
+                    <div id="fAlarmModes" class="alarm-modes">
+                      <label class="row"><input type="checkbox" data-alarm-mode="away" checked /><span id="fAlarmModeAwayLabel">Arm away</span></label>
+                      <label class="row"><input type="checkbox" data-alarm-mode="home" checked /><span id="fAlarmModeHomeLabel">Arm home</span></label>
+                      <label class="row"><input type="checkbox" data-alarm-mode="night" checked /><span id="fAlarmModeNightLabel">Arm night</span></label>
+                      <label class="row"><input type="checkbox" data-alarm-mode="vacation" /><span id="fAlarmModeVacationLabel">Arm vacation</span></label>
+                      <label class="row"><input type="checkbox" data-alarm-mode="custom" /><span id="fAlarmModeCustomLabel">Custom bypass</span></label>
+                      <label class="row"><input type="checkbox" data-alarm-mode="disarm" checked /><span id="fAlarmModeDisarmLabel">Disarm</span></label>
+                    </div>
+                  </div>
+                  <div id="clockOptions" class="slider-options hidden">
+                    <div class="meta" id="fClockHint">Simple clock tile: shows the current time and date.</div>
+                    <label class="row">
+                      <input id="fClockShowSeconds" type="checkbox" />
+                      <span id="fClockShowSecondsLabel">Show seconds</span>
+                    </label>
+                    <label class="row">
+                      <input id="fClockShowDate" type="checkbox" checked />
+                      <span id="fClockShowDateLabel">Show date</span>
+                    </label>
+                  </div>
                   <div id="sensorOptions" class="slider-options hidden">
                     <label><span id="fSensorValueColorLabel">Value color (empty = auto)</span>
                       <input id="fSensorValueColor" type="text" placeholder="#RRGGBB (auto)" />
                     </label>
                   </div>
                   <div id="inspectorStyleEmpty" class="meta hidden" data-i18n-key="inspector.style.empty">No style options for this widget.</div>
+                </div>
+              </details>
+
+              <!-- Tile look group (per-tile visual override) -->
+              <details class="inspector-group" id="tileLookGroup">
+                <summary><span id="inspectorGroupTileLookLabel">Tile look</span></summary>
+                <div class="inspector-group-body">
+                  <label><span id="fTilePresetLabel">Preset</span>
+                    <select id="fTilePreset">
+                      <option value="auto">Theme default</option>
+                      <option value="graphite">Graphite</option>
+                      <option value="emerald">Emerald</option>
+                      <option value="amber">Amber</option>
+                      <option value="violet">Violet</option>
+                      <option value="sky">Sky</option>
+                      <option value="glass">Glass</option>
+                    </select>
+                  </label>
+                  <label><span id="fTileCopySourceLabel">Copy look from</span>
+                    <select id="fTileCopySource">
+                      <option value="">Select a tile...</option>
+                    </select>
+                  </label>
+                  <div class="grid-2">
+                    <button id="tileLookCopyBtn" class="btn small" type="button">Copy look</button>
+                    <button id="tileLookCopyPageBtn" class="btn small" type="button">Apply to all tiles</button>
+                  </div>
+                  <div id="tileLookCopyHint" class="meta">Copies background, border, colors and font size only.</div>
+                  <label class="tile-color-row"><span id="fTileBgColorLabel">Background color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileBgColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileBgColorPick" type="color" value="#16202b" />
+                    </span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileBgGradColorLabel">Gradient end color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileBgGradColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileBgGradColorPick" type="color" value="#0b1219" />
+                    </span>
+                  </label>
+                  <label><span id="fTileBgGradDirLabel">Gradient direction</span>
+                    <select id="fTileBgGradDir">
+                      <option value="none">None</option>
+                      <option value="hor">Horizontal</option>
+                      <option value="ver">Vertical</option>
+                    </select>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileBorderColorLabel">Border color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileBorderColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileBorderColorPick" type="color" value="#6fe8ff" />
+                    </span>
+                  </label>
+                  <label><span id="fTileCornerShapeLabel">Corner shape</span>
+                    <select id="fTileCornerShape">
+                      <option value="custom">Custom (use radius below)</option>
+                      <option value="square">Square (0 px)</option>
+                      <option value="soft">Soft (10 px)</option>
+                      <option value="rounded">Rounded (16 px)</option>
+                      <option value="pill">Pill (40 px)</option>
+                      <option value="circle">Circle (max radius)</option>
+                    </select>
+                  </label>
+                  <div id="tileCornerShapeHint" class="meta">Square tiles become circles with the max radius.</div>
+                  <div class="grid-2">
+                    <label><span id="fTileBorderWidthLabel">Border width (px)</span>
+                      <input id="fTileBorderWidth" type="number" min="0" max="16" step="1" placeholder="auto" />
+                    </label>
+                    <label><span id="fTileRadiusLabel">Corner radius (px)</span>
+                      <input id="fTileRadius" type="number" min="0" max="128" step="1" placeholder="auto" />
+                    </label>
+                    <label><span id="fTileOpacityLabel">BG opacity (%)</span>
+                      <input id="fTileOpacity" type="number" min="0" max="100" step="1" placeholder="auto" />
+                    </label>
+                    <label><span id="fTileFontScaleLabel">Font size</span>
+                      <select id="fTileFontScale">
+                        <option value="auto">Auto</option>
+                        <option value="s">Small</option>
+                        <option value="m">Medium</option>
+                        <option value="l">Large</option>
+                        <option value="xl">Extra large</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="row">
+                    <input id="fTileShadow" type="checkbox" />
+                    <span id="fTileShadowLabel">Drop shadow</span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileTextColorLabel">Text color (all)</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileTextColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileTextColorPick" type="color" value="#e8f1f8" />
+                    </span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileTitleColorLabel">Title color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileTitleColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileTitleColorPick" type="color" value="#e8f1f8" />
+                    </span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileLabelColorLabel">Entity label color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileLabelColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileLabelColorPick" type="color" value="#9db0c3" />
+                    </span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileValueColorLabel">Value / status color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileValueColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileValueColorPick" type="color" value="#e8f1f8" />
+                    </span>
+                  </label>
+                  <label class="tile-color-row"><span id="fTileIconColorLabel">Icon color</span>
+                    <span class="tile-color-inputs">
+                      <input id="fTileIconColor" type="text" placeholder="#RRGGBB (auto)" maxlength="7" />
+                      <input id="fTileIconColorPick" type="color" value="#6fe8ff" />
+                    </span>
+                  </label>
+                  <button id="tileLookResetBtn" class="btn small" type="button">Reset tile look</button>
+                  <div id="tileLookHint" class="meta">Empty fields use the theme. Colors accept #RRGGBB.</div>
                 </div>
               </details>
 
@@ -422,7 +660,7 @@
               <span id="settingsWifiStaticEnabledLabel">Use static IP (instead of DHCP)</span>
             </label>
             <label><span id="settingsWifiStaticIpLabel">IP address</span>
-              <input id="settingsWifiStaticIp" type="text" placeholder="192.168.1.100" maxlength="15" />
+              <input id="settingsWifiStaticIp" type="text" placeholder="192.168.1.50" maxlength="15" />
             </label>
             <label><span id="settingsWifiStaticNetmaskLabel">Netmask</span>
               <input id="settingsWifiStaticNetmask" type="text" placeholder="255.255.255.0" maxlength="15" />
@@ -480,6 +718,9 @@
             <label><span id="settingsScreensaverTimeoutLabel">Screensaver timeout (sec)</span>
               <input id="settingsScreensaverTimeout" type="number" min="5" max="7200" step="1" />
             </label>
+            <label><span id="settingsSaverBrightnessLabel">Screensaver brightness (%)</span>
+              <input id="settingsSaverBrightness" type="number" min="1" max="100" step="1" />
+            </label>
             <label class="row">
               <input id="settingsScreenOffEnabled" type="checkbox" />
               <span id="settingsScreenOffEnabledLabel">Turn off screen</span>
@@ -487,10 +728,20 @@
             <label><span id="settingsScreenOffTimeoutLabel">Screen off timeout (sec)</span>
               <input id="settingsScreenOffTimeout" type="number" min="5" max="7200" step="1" />
             </label>
-            <label class="row">
-              <input id="settingsClock24h" type="checkbox" />
-              <span id="settingsClock24hLabel">24h clock</span>
+            <label><span id="settingsClockFormatLabel">Clock format</span>
+              <select id="settingsClockFormat">
+                <option id="settingsClockFormat24hOption" value="h24">24-hour (23:00)</option>
+                <option id="settingsClockFormat12hOption" value="h12">12-hour (11:00 PM)</option>
+              </select>
             </label>
+            <div id="settingsClockFormatHint" class="meta"></div>
+            <label><span id="settingsClockStyleLabel">Clock style</span>
+              <select id="settingsClockStyle">
+                <option id="settingsClockStyleClassicOption" value="classic">Classic</option>
+                <option id="settingsClockStyleFlipOption" value="flip">Flip cards</option>
+              </select>
+            </label>
+            <div id="settingsClockStyleHint" class="meta"></div>
             <label class="row">
               <input id="settingsShowSeconds" type="checkbox" />
               <span id="settingsShowSecondsLabel">Show seconds</span>
@@ -508,6 +759,41 @@
               </label>
             </div>
             <hr />
+            <label class="row">
+              <input id="settingsNightModeEnabled" type="checkbox" />
+              <span id="settingsNightModeEnabledLabel">Night schedule</span>
+            </label>
+            <div class="row">
+              <label><span id="settingsNightStartLabel">Night start</span>
+                <input id="settingsNightStart" type="time" step="60" />
+              </label>
+              <label><span id="settingsNightEndLabel">Night end</span>
+                <input id="settingsNightEnd" type="time" step="60" />
+              </label>
+            </div>
+            <div class="row">
+              <label><span id="settingsNightBrightnessLabel">Night brightness (%)</span>
+                <input id="settingsNightBrightness" type="number" min="0" max="100" step="1" />
+              </label>
+              <label><span id="settingsNightWakeLabel">Touch wake (sec)</span>
+                <input id="settingsNightWakeSec" type="number" min="0" max="3600" step="1" />
+              </label>
+            </div>
+            <div id="settingsNightHint" class="meta">Inside the night window the panel forces the night brightness.</div>
+            <label class="row">
+              <input id="settingsThemeAutoEnabled" type="checkbox" />
+              <span id="settingsThemeAutoEnabledLabel">Match the theme to the time of day</span>
+            </label>
+            <div class="grid-2">
+              <label><span id="settingsThemeDaySelectLabel">Day theme</span>
+                <select id="settingsThemeDaySelect"></select>
+              </label>
+              <label><span id="settingsThemeNightSelectLabel">Night theme</span>
+                <select id="settingsThemeNightSelect"></select>
+              </label>
+            </div>
+            <div id="settingsThemeAutoHint" class="meta">Day theme is used outside the night window, the night theme inside it. A page can still override the theme on its own (page_theme in the layout).</div>
+            <hr />
             <label><span id="settingsWallpaperLabel">Wallpaper</span>
               <input id="settingsWallpaperFile" type="file" accept="image/*" />
             </label>
@@ -517,10 +803,196 @@
               <button id="removeWallpaperBtn" class="btn small danger" type="button">Remove wallpaper</button>
             </div>
             <div id="settingsWallpaperInfo" class="meta"></div>
+            <hr />
+            <label><span id="settingsTilePressFxLabel">Tap feedback (visual reaction while a tile is held)</span>
+              <select id="settingsTilePressFx">
+                <option id="settingsTilePressFxNoneOption" value="none">None</option>
+                <option id="settingsTilePressFxDimOption" value="dim">Dim</option>
+                <option id="settingsTilePressFxScaleOption" value="scale">Shrink</option>
+                <option id="settingsTilePressFxBothOption" value="both">Dim + shrink</option>
+              </select>
+            </label>
+            <div class="grid-2">
+              <label><span id="settingsTilePressFxDimLabel">Dim (%)</span>
+                <input id="settingsTilePressFxDim" type="number" min="0" max="60" step="1" />
+              </label>
+              <label><span id="settingsTilePressFxScaleLabel">Shrink (% of size)</span>
+                <input id="settingsTilePressFxScale" type="number" min="90" max="100" step="1" />
+              </label>
+            </div>
+            <div id="settingsTilePressFxHint" class="meta">Applies to tiles that react to a tap on the whole tile (switch, button, heating). Hold the sample below to preview.</div>
+            <div class="press-fx-preview" id="settingsTilePressFxPreview">
+              <div class="press-fx-preview-tile" id="settingsTilePressFxPreviewTile">
+                <span id="settingsTilePressFxPreviewLabel">Tile</span>
+              </div>
+            </div>
+            <hr />
+            <label><span id="settingsValueAnimLabel">Value animation (when a tile value changes)</span>
+              <select id="settingsValueAnim">
+                <option id="settingsValueAnimNoneOption" value="none">None</option>
+                <option id="settingsValueAnimFadeOption" value="fade">Fade in</option>
+                <option id="settingsValueAnimSlideOption" value="slide">Slide in</option>
+                <option id="settingsValueAnimCountOption" value="count">Counting digits</option>
+              </select>
+            </label>
+            <div class="grid-2">
+              <label><span id="settingsValueAnimMsLabel">Duration (ms)</span>
+                <input id="settingsValueAnimMs" type="number" min="0" max="1500" step="20" />
+              </label>
+              <div class="anim-preview-row">
+                <span id="settingsValueAnimPreview" class="anim-preview-value">21.4 °C</span>
+                <button id="settingsValueAnimPreviewBtn" class="btn small" type="button">Preview</button>
+              </div>
+            </div>
+            <div id="settingsValueAnimHint" class="meta">Animates values that change by themselves (sensors, weather, power). Counting digits keeps the unit in place and works with values like "22.5 °C". 0 ms turns the effect off.</div>
+            <hr />
+            <label><span id="settingsTopbarHeading">Top bar</span></label>
+            <div class="grid-2">
+              <label class="row">
+                <input id="settingsTopbarShowClock" type="checkbox" />
+                <span id="settingsTopbarShowClockLabel">Clock</span>
+              </label>
+              <label class="row">
+                <input id="settingsTopbarShowDate" type="checkbox" />
+                <span id="settingsTopbarShowDateLabel">Date</span>
+              </label>
+              <label class="row">
+                <input id="settingsTopbarShowGear" type="checkbox" />
+                <span id="settingsTopbarShowGearLabel">Settings icon</span>
+              </label>
+              <label class="row">
+                <input id="settingsTopbarShowStatus" type="checkbox" />
+                <span id="settingsTopbarShowStatusLabel">Wi-Fi / HA icons</span>
+              </label>
+              <label class="row">
+                <input id="settingsTopbarIconText" type="checkbox" />
+                <span id="settingsTopbarIconTextLabel">Text instead of logos</span>
+              </label>
+              <label class="row">
+                <input id="settingsTopbarCustomColors" type="checkbox" />
+                <span id="settingsTopbarCustomColorsLabel">Own colours</span>
+              </label>
+            </div>
+            <div id="settingsTopbarHint" class="meta">The clock is centred in the space that is left over and its font shrinks automatically, so the elements never overlap. "Text instead of logos" replaces the Wi-Fi / Home Assistant / gear glyphs with words.</div>
+            <div id="settingsTopbarColorHint" class="meta">With "Own colours" switched off the top bar follows the active theme.</div>
+            <div class="grid-2" id="settingsTopbarColors">
+              <label><span id="settingsTopbarBgColorLabel">Bar background</span>
+                <input id="settingsTopbarBgColor" type="color" />
+              </label>
+              <label><span id="settingsTopbarClockColorLabel">Clock colour</span>
+                <input id="settingsTopbarClockColor" type="color" />
+              </label>
+              <label><span id="settingsTopbarDateColorLabel">Date colour</span>
+                <input id="settingsTopbarDateColor" type="color" />
+              </label>
+              <label><span id="settingsTopbarGearColorLabel">Settings icon colour</span>
+                <input id="settingsTopbarGearColor" type="color" />
+              </label>
+              <label><span id="settingsTopbarHaColorLabel">Home Assistant colour</span>
+                <input id="settingsTopbarHaColor" type="color" />
+              </label>
+              <label><span id="settingsTopbarWifiColorLabel">Wi-Fi colour</span>
+                <input id="settingsTopbarWifiColor" type="color" />
+              </label>
+            </div>
+            <hr />
+            <label><span id="settingsNavHeading">Bottom bar (page tabs)</span></label>
+            <div class="grid-2">
+              <label class="row">
+                <input id="settingsNavCustomColors" type="checkbox" />
+                <span id="settingsNavCustomColorsLabel">Own colours</span>
+              </label>
+            </div>
+            <div id="settingsNavHint" class="meta">The bottom bar shows the home button and one tab per page. Tab titles are shortened with "..." when a page name is too long.</div>
+            <div id="settingsNavColorHint" class="meta">With "Own colours" switched off the bottom bar follows the active theme.</div>
+            <div class="grid-2" id="settingsNavColors">
+              <label><span id="settingsNavBarBgColorLabel">Bar background</span>
+                <input id="settingsNavBarBgColor" type="color" />
+              </label>
+              <label><span id="settingsNavBarBorderColorLabel">Bar top border</span>
+                <input id="settingsNavBarBorderColor" type="color" />
+              </label>
+              <label><span id="settingsNavButtonBgColorLabel">Tab background</span>
+                <input id="settingsNavButtonBgColor" type="color" />
+              </label>
+              <label><span id="settingsNavButtonBorderColorLabel">Tab border</span>
+                <input id="settingsNavButtonBorderColor" type="color" />
+              </label>
+              <label><span id="settingsNavTabIdleColorLabel">Page title colour</span>
+                <input id="settingsNavTabIdleColor" type="color" />
+              </label>
+              <label><span id="settingsNavTabActiveColorLabel">Active page title colour</span>
+                <input id="settingsNavTabActiveColor" type="color" />
+              </label>
+              <label><span id="settingsNavHomeIdleColorLabel">Home icon colour</span>
+                <input id="settingsNavHomeIdleColor" type="color" />
+              </label>
+              <label><span id="settingsNavHomeActiveColorLabel">Active home icon colour</span>
+                <input id="settingsNavHomeActiveColor" type="color" />
+              </label>
+            </div>
             <div class="row">
               <button id="applyDisplayBtn" class="btn" type="button">Apply now (no reboot)</button>
             </div>
             <div id="settingsDisplayInfo" class="meta"></div>
+          </div>
+        </section>
+
+        <section id="settingsSdSection">
+          <h2 id="settingsSdHeading">microSD card</h2>
+          <div class="form">
+            <label class="row">
+              <input id="settingsSdEnabled" type="checkbox" />
+              <span id="settingsSdEnabledLabel">Enable microSD card (TF slot)</span>
+            </label>
+            <div id="settingsSdStatus" class="meta"></div>
+            <div class="row">
+              <button id="sdRefreshBtn" class="btn small" type="button">Refresh</button>
+              <button id="sdExportLogsBtn" class="btn small" type="button">Export logs to card</button>
+              <button id="sdFormatBtn" class="btn small danger" type="button">Format card</button>
+            </div>
+            <hr />
+            <div class="row">
+              <button id="sdUpBtn" class="btn small" type="button">Up</button>
+              <button id="sdRootBtn" class="btn small" type="button">Card root</button>
+              <button id="sdLogsBtn" class="btn small" type="button">Logs folder</button>
+              <button id="sdPhotosBtn" class="btn small" type="button">Photos folder</button>
+            </div>
+            <div id="sdPath" class="meta">/</div>
+            <div id="sdFileList" class="sd-file-list"></div>
+            <div id="sdWallpaperStore" class="meta"></div>
+            <div id="settingsSdInfo" class="meta"></div>
+          </div>
+        </section>
+
+        <section id="settingsPagesSection">
+          <h2 id="settingsPagesHeading">Pages / Page transition</h2>
+          <div class="form">
+            <label><span id="settingsPageTransitionLabel">Page transition</span>
+              <select id="settingsPageTransition">
+                <option id="settingsPageTransitionNoneOption" value="none">None</option>
+                <option id="settingsPageTransitionFadeOption" value="fade">Fade</option>
+                <option id="settingsPageTransitionSlideOption" value="slide">Slide</option>
+                <option id="settingsPageTransitionSlideUpOption" value="slide_up">Slide up</option>
+                <option id="settingsPageTransitionFadeSlideOption" value="fade_slide">Fade + slide</option>
+              </select>
+            </label>
+            <label><span id="settingsPageTransitionMsLabel">Transition duration (ms)</span>
+              <input id="settingsPageTransitionMs" type="number" min="0" max="1200" step="20" />
+            </label>
+            <div id="settingsPageTransitionHint" class="meta">0 ms disables the animation for the selected effect.</div>
+            <hr />
+            <label><span id="settingsPageTargetLabel">Show page on panel</span>
+              <select id="settingsPageTarget"></select>
+            </label>
+            <div class="row">
+              <button id="reloadPagesBtn" class="btn small" type="button">Reload page list</button>
+              <button id="showPageOnPanelBtn" class="btn small" type="button">Show now</button>
+            </div>
+            <div id="settingsPageActivateInfo" class="meta"></div>
+            <hr />
+            <button id="applyPagesBtn" class="btn" type="button">Apply now (no reboot)</button>
+            <div id="settingsPagesInfo" class="meta"></div>
           </div>
         </section>
 
@@ -531,8 +1003,13 @@
               <input id="settingsMqttEnabled" type="checkbox" />
               <span id="settingsMqttEnabledLabel">Enable MQTT (auto-discovered as a device in Home Assistant)</span>
             </label>
+            <label class="row">
+              <input id="settingsMqttUseTls" type="checkbox" />
+              <span id="settingsMqttUseTlsLabel">Use TLS (mqtts, port 8883)</span>
+            </label>
+            <div id="settingsMqttTlsHint" class="meta"></div>
             <label><span id="settingsMqttHostLabel">Broker host (empty = derive from HA URL)</span>
-              <input id="settingsMqttHost" type="text" placeholder="192.168.1.100" maxlength="128" />
+              <input id="settingsMqttHost" type="text" placeholder="homeassistant.local" maxlength="128" />
             </label>
             <label><span id="settingsMqttPortLabel">Broker port</span>
               <input id="settingsMqttPort" type="number" min="1" max="65535" step="1" />
@@ -650,6 +1127,32 @@
             </label>
             <div id="settingsSystemInfo" class="meta"></div>
           </div>
+        </section>
+
+        <section id="settingsBackupSection">
+          <h2 id="settingsBackupHeading">Backup / Restore</h2>
+          <div class="form">
+            <div id="settingsBackupHint" class="meta">The backup contains the layout, public settings and custom themes.</div>
+            <div class="row">
+              <button id="downloadBackupBtn" class="btn small" type="button">Download backup</button>
+            </div>
+            <hr />
+            <label><span id="settingsBackupFileLabel">Backup file to restore</span>
+              <input id="settingsBackupFile" type="file" accept="application/json,.json" />
+            </label>
+            <button id="restoreBackupBtn" class="btn danger" type="button">Restore backup</button>
+            <div id="settingsBackupInfo" class="meta"></div>
+          </div>
+        </section>
+
+        <section id="settingsDiagnosticsSection">
+          <h2 id="settingsDiagnosticsHeading">Diagnostics</h2>
+          <div class="row">
+            <button id="diagnosticsRefreshBtn" class="btn small" type="button">Refresh</button>
+            <label><input id="diagnosticsAutoRefresh" type="checkbox" /> <span id="diagnosticsAutoRefreshLabel">Auto-refresh (10 s)</span></label>
+          </div>
+          <div id="diagnosticsMeta" class="meta"></div>
+          <div class="diag-grid" id="diagnosticsGrid"></div>
         </section>
 
         <section id="settingsLogsSection">

@@ -21,9 +21,11 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
+#include "app_task.h"
 #include "ui/fonts/app_text_fonts.h"
 #include "ui/ui_i18n.h"
 #include "ui/ui_memory.h"
+#include "ui/ui_value_anim.h"
 #include "ui/theme/theme_default.h"
 
 #define GRAPH_POINTS_MIN 16
@@ -584,8 +586,8 @@ static void graph_persist_start_once(void)
     }
 
     if (s_graph_persist_task == NULL) {
-        BaseType_t created = xTaskCreate(graph_persist_task, "graph_persist", GRAPH_HISTORY_PERSIST_TASK_STACK, NULL,
-            GRAPH_HISTORY_PERSIST_TASK_PRIO, &s_graph_persist_task);
+        BaseType_t created = app_task_create(graph_persist_task, "graph_persist", GRAPH_HISTORY_PERSIST_TASK_STACK,
+            NULL, GRAPH_HISTORY_PERSIST_TASK_PRIO, &s_graph_persist_task);
         if (created != pdPASS) {
             ESP_LOGW(TAG, "failed to start graph persist task");
             vQueueDelete(s_graph_persist_queue);
@@ -1407,16 +1409,19 @@ esp_err_t w_graph_create(const ui_widget_def_t *def, lv_obj_t *parent, ui_widget
     theme_default_style_card(card);
 
     lv_obj_t *title = lv_label_create(card);
+    lv_obj_add_flag(title, LV_OBJ_FLAG_USER_1);
     lv_label_set_text(title, def->title[0] ? def->title : def->id);
     lv_obj_set_style_text_color(title, theme_default_color_text_muted(), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, APP_FONT_TEXT_20, LV_PART_MAIN);
 
     lv_obj_t *value = lv_label_create(card);
+    lv_obj_add_flag(value, LV_OBJ_FLAG_USER_3);
     lv_label_set_text(value, "--");
     lv_obj_set_style_text_color(value, theme_default_color_text_primary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(value, APP_FONT_TEXT_20, LV_PART_MAIN);
 
     lv_obj_t *meta = lv_label_create(card);
+    lv_obj_add_flag(meta, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(meta, "");
     lv_obj_set_style_text_color(meta, theme_default_color_text_muted(), LV_PART_MAIN);
     lv_obj_set_style_text_font(meta, APP_FONT_TEXT_20, LV_PART_MAIN);
@@ -1542,7 +1547,7 @@ void w_graph_apply_state(ui_widget_instance_t *instance, const ha_state_t *state
 
     char value_text[48] = {0};
     graph_format_value(value_text, sizeof(value_text), numeric, ctx->unit);
-    lv_label_set_text(ctx->value_label, value_text);
+    ui_value_anim_set_text(ctx->value_label, value_text);
 
     uint32_t bucket_ts = graph_current_bucket_ts();
     bool history_changed = graph_history_append_or_update(ctx, bucket_ts, numeric, NULL);

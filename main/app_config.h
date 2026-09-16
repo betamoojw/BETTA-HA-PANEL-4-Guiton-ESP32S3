@@ -37,14 +37,122 @@
 
 #define APP_DISPLAY_ACTIVE_BRIGHTNESS_PERCENT 100
 #define APP_DISPLAY_DIM_BRIGHTNESS_PERCENT 10
+/* Backlight level used while the screensaver clock is on screen: dark enough
+ * not to light up the room, bright enough to read the time. */
+#define APP_DISPLAY_SAVER_BRIGHTNESS_PERCENT 20
 #define APP_DISPLAY_DIM_TIMEOUT_MS (3 * 60 * 1000)
 #define APP_DISPLAY_SCREENSAVER_TIMEOUT_SEC 120
-#define APP_DISPLAY_SCREEN_OFF_TIMEOUT_SEC 30
+#define APP_DISPLAY_SCREEN_OFF_TIMEOUT_SEC 300
+/* Auto screen-off stays off until it is switched on by hand (web UI, on-panel
+ * settings or MQTT). A panel with fresh/reset settings must never blank itself. */
+#define APP_DISPLAY_SCREEN_OFF_ENABLED 0
 #define APP_DISPLAY_CLOCK_24H 1
 #define APP_DISPLAY_SAVER_SHOW_SECONDS 0
 #define APP_DISPLAY_SAVER_SHOW_DATE 1
 #define APP_DISPLAY_SAVER_CLOCK_COLOR 0xFFFFFF
 #define APP_DISPLAY_SAVER_DATE_COLOR 0xC8C8C8
+/* Night schedule: inside the window the backlight is forced to
+ * APP_DISPLAY_NIGHT_BRIGHTNESS_PERCENT (0 = off) and a touch only wakes the
+ * panel for APP_DISPLAY_NIGHT_WAKE_SEC seconds. Defaults 22:00 - 06:00. */
+#define APP_DISPLAY_NIGHT_MODE_ENABLED 0
+#define APP_DISPLAY_NIGHT_START_MIN (22 * 60)
+#define APP_DISPLAY_NIGHT_END_MIN (6 * 60)
+#define APP_DISPLAY_NIGHT_BRIGHTNESS_PERCENT 0
+#define APP_DISPLAY_NIGHT_WAKE_SEC 20
+/* Gap between the clock baseline block and the bottom screen edge, and the gap
+ * between the date caption and the clock above it. */
+#define APP_DISPLAY_SAVER_CLOCK_BOTTOM_GAP 26
+#define APP_DISPLAY_SAVER_DATE_GAP 8
+/* Screensaver clock style. CLASSIC draws the plain digital clock, FLIP draws
+ * four flip-clock cards whose digits fold over a centre seam whenever the time
+ * changes. */
+#define APP_DISPLAY_SAVER_CLOCK_STYLE_CLASSIC 0
+#define APP_DISPLAY_SAVER_CLOCK_STYLE_FLIP 1
+#define APP_DISPLAY_SAVER_CLOCK_STYLE_DEFAULT APP_DISPLAY_SAVER_CLOCK_STYLE_CLASSIC
+/* Flip card geometry in pixels (panel is 480x480: 4 * 74 + 3 * 14 = 338) and
+ * the length of one half of the digit fold animation. */
+#define APP_DISPLAY_SAVER_FLIP_CARD_W 74
+#define APP_DISPLAY_SAVER_FLIP_CARD_H 100
+#define APP_DISPLAY_SAVER_FLIP_CARD_GAP 14
+#define APP_DISPLAY_SAVER_FLIP_CARD_RADIUS 16
+#define APP_DISPLAY_SAVER_FLIP_CARD_COLOR 0x1A1D24
+/* Distance of the digit line box from the top of a card. The line box is 65 px
+ * tall (APP_FONT_CLOCK_84) and the fold seam sits at CARD_H / 2, so 18 px puts
+ * the digit ink exactly on the seam. */
+#define APP_DISPLAY_SAVER_FLIP_LABEL_Y 18
+#define APP_DISPLAY_SAVER_FLIP_ANIM_MS 150
+/* 12 hour format badge ("AM"/"PM") that sits to the right of the clock like on
+ * any digital clock. Poppins ships without a bold cut here and LVGL only
+ * thickens outlines of vector fonts, so the badge is drawn WEIGHT times, one
+ * pixel apart, which gives the letters a bold weight. It gets a black plate of
+ * its own so it stays readable over wallpapers: GAP is the space between the
+ * digits and the badge, PAD/RADIUS shape that plate. */
+#define APP_DISPLAY_SAVER_AMPM_GAP 10
+#define APP_DISPLAY_SAVER_AMPM_WEIGHT 1
+#define APP_DISPLAY_SAVER_AMPM_PAD 4
+#define APP_DISPLAY_SAVER_AMPM_RADIUS 8
+/* Page transition: animation used when the active page changes.
+ * One of "none", "fade", "slide", "slide_up", "fade_slide"; a duration of
+ * 0 ms disables the animation as well. */
+#define APP_DISPLAY_PAGE_TRANSITION_MAX_LEN 16
+#define APP_DISPLAY_PAGE_TRANSITION_DEFAULT "fade"
+#define APP_DISPLAY_PAGE_TRANSITION_DEFAULT_MS 220
+#define APP_DISPLAY_PAGE_TRANSITION_MAX_MS 1200
+/* Tap feedback: short visual reaction of an interactive tile while it is held
+ * down. APP_TILE_PRESS_FX is one of "none", "dim", "scale", "both"; _DIM is how
+ * much the whole tile fades out while pressed (percent, 0 = no fade) and
+ * _SCALE_PCT is the size the tile shrinks to (percent of its normal size,
+ * 100 = no shrink). */
+#define APP_TILE_PRESS_FX_MAX_LEN 8
+#define APP_TILE_PRESS_FX_DEFAULT "both"
+#define APP_TILE_PRESS_FX_DIM_DEFAULT 15
+#define APP_TILE_PRESS_FX_DIM_MAX 60
+#define APP_TILE_PRESS_FX_SCALE_DEFAULT 97
+#define APP_TILE_PRESS_FX_SCALE_MIN 90
+#define APP_TILE_PRESS_FX_SCALE_MAX 100
+/* Value animation: how a tile readout reacts when the entity state changes.
+ * APP_DISPLAY_VALUE_ANIM is one of "none", "fade", "slide", "count", where
+ * "count" steps the number from the old to the new value and falls back to
+ * "fade" for texts that hold no single number; _MS is the duration and 0
+ * disables the animation as well. */
+#define APP_DISPLAY_VALUE_ANIM_MAX_LEN 8
+#define APP_DISPLAY_VALUE_ANIM_DEFAULT "count"
+#define APP_DISPLAY_VALUE_ANIM_DEFAULT_MS 320
+#define APP_DISPLAY_VALUE_ANIM_MAX_MS 1500
+/* Top bar: which elements are visible, whether the status icons use the
+ * original logos or plain text, and the optional own colour set. The colours
+ * below are only used when APP_DISPLAY_TOPBAR_CUSTOM_COLORS is enabled -
+ * otherwise the active theme keeps owning the top bar look. The literals match
+ * the default theme palette so the first switch to custom colours does not
+ * change anything on screen. */
+#define APP_DISPLAY_TOPBAR_SHOW_CLOCK 1
+#define APP_DISPLAY_TOPBAR_SHOW_DATE 1
+#define APP_DISPLAY_TOPBAR_SHOW_GEAR 1
+#define APP_DISPLAY_TOPBAR_SHOW_STATUS 1
+#define APP_DISPLAY_TOPBAR_ICON_TEXT 0
+#define APP_DISPLAY_TOPBAR_CUSTOM_COLORS 0
+#define APP_DISPLAY_TOPBAR_BG_COLOR 0x0D1723
+#define APP_DISPLAY_TOPBAR_CLOCK_COLOR 0xEAF2FA
+#define APP_DISPLAY_TOPBAR_DATE_COLOR 0xA1B1C1
+#define APP_DISPLAY_TOPBAR_GEAR_COLOR 0xA1B1C1
+#define APP_DISPLAY_TOPBAR_HA_COLOR 0xC7D1DB
+#define APP_DISPLAY_TOPBAR_WIFI_COLOR 0xC7D1DB
+/* Fonts the top bar clock falls back to when the free space next to the date
+ * and the status chips is too narrow for the default size. */
+#define APP_DISPLAY_TOPBAR_CLOCK_MIN_FONT 22
+
+/* Bottom bar (page tabs) own colours, same idea as the top bar above. The
+ * literals are the dark_v2 palette values the bar already uses, so flipping
+ * APP_DISPLAY_NAV_CUSTOM_COLORS on does not change anything on screen. */
+#define APP_DISPLAY_NAV_CUSTOM_COLORS 0
+#define APP_DISPLAY_NAV_BAR_BG_COLOR 0x0D1723
+#define APP_DISPLAY_NAV_BAR_BORDER_COLOR 0x2A3D50
+#define APP_DISPLAY_NAV_BUTTON_BG_COLOR 0x1B2A3A
+#define APP_DISPLAY_NAV_BUTTON_BORDER_COLOR 0x385064
+#define APP_DISPLAY_NAV_TAB_IDLE_COLOR 0xA9C3D0
+#define APP_DISPLAY_NAV_TAB_ACTIVE_COLOR 0x6FE8FF
+#define APP_DISPLAY_NAV_HOME_IDLE_COLOR 0x9EB8C7
+#define APP_DISPLAY_NAV_HOME_ACTIVE_COLOR 0x53E5FF
 
 #if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
 #define APP_EVENT_QUEUE_LENGTH 64
@@ -60,10 +168,18 @@
 #define APP_SETTINGS_PATH "/littlefs/settings.json"
 #define APP_SETTINGS_MAX_JSON_LEN 4096
 
+/* Full backup download (layout + public settings + custom themes) and the
+ * upload limit for /api/backup/restore. */
+#define APP_BACKUP_MAX_JSON_LEN 32768
+
 /* UI task watchdog: the system log task restarts the panel when the UI heartbeat
  * stops advancing for this long (the UI task is stuck holding the LVGL lock and
  * can never drain the event queue). */
 #define APP_UI_WATCHDOG_TIMEOUT_MS 60000
+
+/* OTA rollback guard: a freshly updated image must prove itself (Wi-Fi joined,
+ * or this much uptime) before the bootloader retires the rollback option. */
+#define APP_BOOT_CONFIRM_TIMEOUT_MS (30 * 60 * 1000)
 
 /* Persistent system/diagnostic log (auto-rotating, bounded on LittleFS). */
 #define APP_LOG_DIR "/littlefs/logs"
@@ -73,10 +189,15 @@
 #define APP_LOG_RING_BYTES 8192
 #define APP_LOG_HEARTBEAT_MS 30000
 
-/* Screensaver wallpaper: raw RGB565 frame at native panel resolution. */
+/* Screensaver wallpaper: raw RGB565 frame at native panel resolution.  While a
+ * card is mounted the frame is kept on the card only (see
+ * ui_screen_saver_wallpaper_path()); LittleFS holds the fallback copy used when
+ * no card is in the socket. */
 #define APP_WALLPAPER_PATH "/littlefs/wallpaper.bin"
 #define APP_WALLPAPER_TMP_PATH "/littlefs/wallpaper.tmp"
 #define APP_WALLPAPER_BYTES ((APP_SCREEN_WIDTH) * (APP_SCREEN_HEIGHT) * 2)
+#define APP_SD_WALLPAPER_PATH APP_SD_MOUNT_POINT "/" APP_SD_PHOTO_DIR "/wallpaper.bin"
+#define APP_SD_WALLPAPER_TMP_PATH APP_SD_MOUNT_POINT "/" APP_SD_PHOTO_DIR "/wallpaper.tmp"
 
 #define APP_WIFI_SSID_MAX_LEN 33
 #define APP_WIFI_PASSWORD_MAX_LEN 65
@@ -97,6 +218,7 @@
 
 #define APP_MQTT_ENABLED_DEFAULT 1
 #define APP_MQTT_PORT_DEFAULT 1883
+#define APP_MQTT_TLS_PORT_DEFAULT 8883
 #define APP_MQTT_DISCOVERY_PREFIX_DEFAULT "homeassistant"
 
 #define APP_I18N_DIR "/littlefs/i18n"
@@ -123,6 +245,51 @@
 #define APP_MAX_ICON_LEN 64
 #define APP_MAX_UI_OPTION_LEN 24
 #define APP_MAX_COLOR_STR_LEN 16
+#define APP_MAX_ALARM_CODE_LEN 24
+#define APP_MAX_ALARM_MODES_LEN 48
+
+/* ---- microSD / TF card --------------------------------------------------
+ * The 4" board wires the TF socket to the SPI bus (manufacturer demo
+ * `switch86_lvgl_music/HAL.h`: SD_CS 42, SPI_MOSI 47, SPI_MISO 41, SPI_SCK 48;
+ * the pin spreadsheet lists the same pins as TF(SCK)/TF(SDA)/TF(D1)/TF(D3)).
+ * IO47/IO48 are shared with the bit-banged ST7701 init sequence, so the card
+ * is mounted only once display_init() has returned and the RGB panel has
+ * released those pins (enable_io_multiplex=1).  The other panel variants have
+ * no socket, so the feature is compiled out there. */
+#if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
+#define APP_SD_SUPPORTED 1
+#else
+#define APP_SD_SUPPORTED 0
+#endif
+#define APP_SD_PIN_SCK 48
+#define APP_SD_PIN_MOSI 47
+#define APP_SD_PIN_MISO 41
+#define APP_SD_PIN_CS 42
+#define APP_SD_MOUNT_POINT "/sd"
+/* The socket is only wired for SPI mode (DAT0 is not connected), so the card
+ * is always driven at this clock.  10 MHz is the fastest rate that proved
+ * reliable on the 4" board. */
+#define APP_SD_SPI_HOST 2
+#define APP_SD_FREQ_HZ (10 * 1000 * 1000)
+/* Filesystem written by the formatter, and the folder layout created on a
+ * freshly formatted card. */
+#define APP_SD_MAX_FILES 64
+#define APP_SD_MAX_PATH_LEN 128
+#define APP_SD_MAX_NAME_LEN 64
+/* Name shown for the card in the web UI and the diagnostics page. */
+#define APP_SD_CARD_NAME_LEN 16
+/* Filesystem found on a card the panel cannot mount ("exFAT", "NTFS", ...). */
+#define APP_SD_FS_NAME_LEN 12
+/* Rotated logs live here.  The exporter keeps at most MAX_FILES exports and at
+ * most MAX_BYTES in total; a single export is roughly the whole internal log
+ * history (~380 kB today), so the file count is normally the binding limit and
+ * the byte budget only guards against a runaway log. */
+#define APP_SD_LOG_DIR "logs"
+#define APP_SD_PHOTO_DIR "photos"
+#define APP_SD_LOG_MAX_FILES 8
+#define APP_SD_LOG_MAX_BYTES (4 * 1024 * 1024)
+/* Automatic log export interval (0 disables the periodic export). */
+#define APP_SD_LOG_EXPORT_PERIOD_SEC (6 * 60 * 60)
 
 #define APP_HA_MAX_ENTITIES 256
 #define APP_HA_MAX_STATES 256
@@ -137,7 +304,8 @@
 #define APP_HA_LIGHT_DISCOVERY_MAX_AREAS 96
 #define APP_HA_LIGHT_DISCOVERY_MAX_DEVICES 256
 #define APP_HA_DISCOVERY_ID_MAX_LEN 48
-#define APP_HA_DISCOVERY_DOMAIN_MAX_LEN 16
+/* Must fit the longest supported domain: "alarm_control_panel" (19 chars + NUL). */
+#define APP_HA_DISCOVERY_DOMAIN_MAX_LEN 24
 #define APP_HA_DISCOVERY_SEARCH_MAX_LEN 64
 /* Disable only the raw HA registry WS discovery by default; the light picker stays enabled via template pages. */
 #define APP_HA_LIGHT_DISCOVERY_REGISTRY_ENABLED 0

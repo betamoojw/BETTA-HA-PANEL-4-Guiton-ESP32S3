@@ -21,6 +21,7 @@
 #include "ui/fonts/app_text_fonts.h"
 #include "ui/theme/theme_default.h"
 #include "ui/ui_i18n.h"
+#include "ui/ui_slider_touch.h"
 #include "ui/ui_bindings.h"
 #include "ha/ha_cover_fetcher.h"
 
@@ -792,6 +793,7 @@ esp_err_t w_media_player_create(const ui_widget_def_t *def, lv_obj_t *parent, ui
     /* ---- Widget title (always pinned top-left of full card) ---- */
     if (has_widget_title) {
         lv_obj_t *title = lv_label_create(card);
+        lv_obj_add_flag(title, LV_OBJ_FLAG_USER_1);
         lv_label_set_text(title, def->title);
         lv_obj_set_width(title, content_w);
         lv_obj_set_style_text_font(title, APP_FONT_TEXT_16, LV_PART_MAIN);
@@ -809,6 +811,7 @@ esp_err_t w_media_player_create(const ui_widget_def_t *def, lv_obj_t *parent, ui
     if (landscape && has_widget_title) y += widget_title_h + 4;
 
     lv_obj_t *now_title = lv_label_create(card);
+    lv_obj_add_flag(now_title, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(now_title, "");
     lv_obj_set_style_text_font(now_title, APP_FONT_TEXT_20, LV_PART_MAIN);
     lv_obj_set_style_text_align(now_title, text_align, LV_PART_MAIN);
@@ -817,6 +820,7 @@ esp_err_t w_media_player_create(const ui_widget_def_t *def, lv_obj_t *parent, ui
     ctx->now_title = now_title;
 
     lv_obj_t *now_artist = lv_label_create(card);
+    lv_obj_add_flag(now_artist, LV_OBJ_FLAG_USER_2);
     lv_label_set_text(now_artist, "");
     lv_obj_set_style_text_font(now_artist, APP_FONT_TEXT_16, LV_PART_MAIN);
     lv_label_set_long_mode(now_artist, LV_LABEL_LONG_DOT);
@@ -848,12 +852,14 @@ esp_err_t w_media_player_create(const ui_widget_def_t *def, lv_obj_t *parent, ui
     ctx->progress_bar = progress;
 
     lv_obj_t *pos_label = lv_label_create(card);
+    lv_obj_add_flag(pos_label, LV_OBJ_FLAG_USER_3);
     lv_label_set_text(pos_label, "");
     lv_obj_set_style_text_font(pos_label, APP_FONT_TEXT_14, LV_PART_MAIN);
     lv_obj_set_style_text_align(pos_label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     ctx->pos_label = pos_label;
 
     lv_obj_t *dur_label = lv_label_create(card);
+    lv_obj_add_flag(dur_label, LV_OBJ_FLAG_USER_3);
     lv_label_set_text(dur_label, "");
     lv_obj_set_style_text_font(dur_label, APP_FONT_TEXT_14, LV_PART_MAIN);
     lv_obj_set_style_text_align(dur_label, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
@@ -884,6 +890,7 @@ esp_err_t w_media_player_create(const ui_widget_def_t *def, lv_obj_t *parent, ui
     lv_obj_add_event_cb(vol_slider, mp_volume_event_cb, LV_EVENT_RELEASED, ctx);
     lv_obj_add_event_cb(vol_slider, mp_volume_event_cb, LV_EVENT_PRESS_LOST, ctx);
     lv_obj_add_event_cb(vol_slider, mp_volume_event_cb, LV_EVENT_DELETE, ctx);
+    ui_slider_touch_enable(vol_slider);
     lv_obj_set_style_radius(vol_slider, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_radius(vol_slider, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
     lv_obj_set_style_radius(vol_slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);

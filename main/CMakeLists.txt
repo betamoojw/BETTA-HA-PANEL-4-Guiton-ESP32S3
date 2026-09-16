@@ -34,6 +34,7 @@ idf_component_register(
         "api/api_entities.c"
         "api/api_state.c"
         "api/api_settings.c"
+        "api/api_sd.c"
         "api/api_i18n.c"
         "api/api_wifi.c"
         "api/api_version.c"
@@ -41,8 +42,14 @@ idf_component_register(
         "api/api_ota.c"
         "api/api_theme.c"
         "api/api_ha_diagnostics.c"
+        "api/api_diagnostics.c"
         "api/api_system_log.c"
+        "api/api_backup.c"
+        "api/api_pages.c"
+        "diag/boot_guard.c"
         "diag/system_log.c"
+        "sd/sd_card.c"
+        "sd/sd_logs.c"
         ${PANEL_DRIVER_SRCS}
         "ha/ha_client.c"
         "ha/ha_ws.c"
@@ -50,6 +57,7 @@ idf_component_register(
         "ha/ha_energy_model.c"
         "ha/ha_light_capabilities.c"
         "ha/ha_cover_fetcher.c"
+        "ha/ha_alarm_events.c"
         "layout/layout_store.c"
         "layout/layout_validate.c"
         "settings/runtime_settings.c"
@@ -58,15 +66,23 @@ idf_component_register(
         "net/time_sync.c"
         "mqtt/panel_mqtt.c"
         "ui/ui_runtime.c"
+        "ui/ui_lvgl_mem.c"
         "ui/ui_boot_splash.c"
         "ui/ui_ota_progress.c"
         "ui/ui_pages.c"
+        "ui/ui_page_style.c"
+        "ui/ui_page_transition.c"
+        "ui/ui_press_feedback.c"
         "ui/ui_screen_saver.c"
         "ui/ui_screen_settings.c"
+        "ui/ui_slider_touch.c"
+        "ui/ui_theme_router.c"
+        "ui/ui_value_anim.c"
         "ui/ui_energy_page.c"
         "ui/ui_music_page.c"
         "ui/ui_i18n.c"
         "ui/ui_widget_factory.c"
+        "ui/ui_tile_style.c"
         "ui/ui_bindings.c"
         "ui/widgets/w_sensor.c"
         "ui/widgets/w_button.c"
@@ -80,6 +96,12 @@ idf_component_register(
         "ui/widgets/w_media_player.c"
         "ui/widgets/w_roborock.c"
         "ui/widgets/w_binary_sensor.c"
+        "ui/widgets/w_alarm_tile.c"
+        "ui/widgets/w_clock_alarm.c"
+        "ui/widgets/w_cover_tile.c"
+        "ui/widgets/w_scene_tile.c"
+        "ui/widgets/w_person_tile.c"
+        "ui/widgets/w_timer_tile.c"
         "ui/fonts/mdi_font_registry.c"
         "ui/theme/theme_default.c"
         "ui/theme/theme_palette.c"
@@ -95,6 +117,7 @@ idf_component_register(
         "layout"
         "mqtt"
         "net"
+        "sd"
         "ui"
         "ui/theme"
         "util"
@@ -107,6 +130,10 @@ idf_component_register(
         esp_driver_gpio
         esp_driver_i2c
         esp_driver_ledc
+        esp_driver_sdspi
+        esp_driver_sdmmc
+        sdmmc
+        fatfs
         esp_websocket_client
         esp_http_client
         esp_http_server
@@ -121,6 +148,7 @@ idf_component_register(
         littlefs
         webui
         esp_driver_jpeg
+        esp_driver_tsens
 )
 
 # ESP-Hosted (P4 + C6 coprocessor) is only used by panel4 / panel10.

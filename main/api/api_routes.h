@@ -7,7 +7,6 @@
 #include "esp_http_server.h"
 
 esp_err_t api_routes_register(httpd_handle_t server);
-
 esp_err_t api_layout_get_handler(httpd_req_t *req);
 esp_err_t api_layout_put_handler(httpd_req_t *req);
 esp_err_t api_entities_get_handler(httpd_req_t *req);
@@ -17,8 +16,16 @@ esp_err_t api_ha_energy_get_handler(httpd_req_t *req);
 esp_err_t api_state_get_handler(httpd_req_t *req);
 esp_err_t api_settings_get_handler(httpd_req_t *req);
 esp_err_t api_settings_put_handler(httpd_req_t *req);
+esp_err_t api_sd_status_get_handler(httpd_req_t *req);
+esp_err_t api_sd_status_put_handler(httpd_req_t *req);
+esp_err_t api_sd_format_post_handler(httpd_req_t *req);
+esp_err_t api_sd_files_get_handler(httpd_req_t *req);
+esp_err_t api_sd_file_get_handler(httpd_req_t *req);
+esp_err_t api_sd_file_delete_handler(httpd_req_t *req);
+esp_err_t api_sd_logs_export_post_handler(httpd_req_t *req);
 esp_err_t api_display_activity_post_handler(httpd_req_t *req);
 esp_err_t api_display_wallpaper_post_handler(httpd_req_t *req);
+esp_err_t api_display_wallpaper_get_handler(httpd_req_t *req);
 esp_err_t api_display_wallpaper_delete_handler(httpd_req_t *req);
 esp_err_t api_i18n_languages_get_handler(httpd_req_t *req);
 esp_err_t api_i18n_effective_get_handler(httpd_req_t *req);
@@ -30,8 +37,15 @@ esp_err_t api_ota_status_get_handler(httpd_req_t *req);
 esp_err_t api_ota_url_post_handler(httpd_req_t *req);
 esp_err_t api_ota_upload_post_handler(httpd_req_t *req);
 esp_err_t api_ha_diagnostics_get_handler(httpd_req_t *req);
+esp_err_t api_diagnostics_get_handler(httpd_req_t *req);
 esp_err_t api_logs_get_handler(httpd_req_t *req);
 esp_err_t api_logs_delete_handler(httpd_req_t *req);
+
+esp_err_t api_backup_get_handler(httpd_req_t *req);
+esp_err_t api_backup_restore_post_handler(httpd_req_t *req);
+
+esp_err_t api_pages_get_handler(httpd_req_t *req);
+esp_err_t api_pages_activate_post_handler(httpd_req_t *req);
 
 esp_err_t api_themes_list_get_handler(httpd_req_t *req);
 esp_err_t api_themes_active_get_handler(httpd_req_t *req);

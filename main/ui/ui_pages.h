@@ -9,6 +9,8 @@
 
 #include "lvgl.h"
 
+#include "settings/runtime_settings.h"
+
 typedef void (*ui_pages_show_cb_t)(const char *page_id, uint16_t index);
 
 void ui_pages_init(void);
@@ -17,6 +19,9 @@ lv_obj_t *ui_pages_add(const char *page_id, const char *title);
 bool ui_pages_show(const char *page_id);
 bool ui_pages_show_index(uint16_t index);
 bool ui_pages_next(void);
+/* Page id/title by list position; empty string for an out-of-range index. */
+const char *ui_pages_id_at(uint16_t index);
+const char *ui_pages_title_at(uint16_t index);
 const char *ui_pages_current_id(void);
 /* Register a single callback that is invoked whenever the active page
  * changes (after the new page has been made visible).  Passing NULL
@@ -26,3 +31,7 @@ uint16_t ui_pages_count(void);
 void ui_pages_set_topbar_status(
     bool wifi_connected, bool wifi_setup_ap_active, bool api_connected, bool api_initial_sync_done);
 void ui_pages_set_topbar_datetime(const struct tm *timeinfo);
+/* Apply the top bar settings (visibility, colours, icon style) and re-lay the
+ * top bar out.  Safe to call from any task. */
+void ui_pages_apply_topbar_settings(const runtime_settings_t *settings);
+void ui_pages_apply_bottom_bar_settings(const runtime_settings_t *settings);

@@ -15,6 +15,7 @@
 #include "ui/fonts/app_text_fonts.h"
 #include "ui/ui_i18n.h"
 #include "ui/ui_screen_saver.h"
+#include "ui/ui_slider_touch.h"
 
 #define SETTINGS_BG lv_color_hex(0x1B1E23)
 #define SETTINGS_ROW_BG lv_color_hex(0x24282F)
@@ -37,11 +38,23 @@ static lv_obj_t *ui_screen_settings_make_label(lv_obj_t *parent, const char *tex
 static const uint32_t SCREENSAVER_TIMEOUTS[] = {15, 30, 60, 120, 300};
 static const uint32_t SCREEN_OFF_TIMEOUTS[] = {30, 60, 120, 300, 600};
 
+/* Rows are stacked from the boxes LVGL actually created instead of hardcoded y
+ * offsets, so a new row can never land on top of the previous one whatever the
+ * font metrics are. Vertical scrolling stays enabled as a safety net, so a
+ * shorter display scrolls instead of clipping the last row. */
+#define SETTINGS_ROW_FIRST_Y 70
+#define SETTINGS_LABEL_TO_SLIDER_GAP 0
+#define SETTINGS_AFTER_SLIDER_GAP 12 /* clear of the 6 px knob overhang */
+#define SETTINGS_AFTER_TOGGLE_GAP 4
+#define SETTINGS_AFTER_CHIP_GAP 2
+
 static runtime_settings_t s_cfg;
 static lv_obj_t *s_page = NULL;
 static lv_obj_t *s_brightness_value = NULL;
+static lv_obj_t *s_saver_brightness_value = NULL;
 static lv_obj_t *s_saver_timeout_label = NULL;
 static lv_obj_t *s_off_timeout_label = NULL;
+static int16_t s_row_y = SETTINGS_ROW_FIRST_Y;
 
 static void ui_screen_settings_format_timeout(uint32_t seconds, char *buf, size_t len)
 {
@@ -88,10 +101,33 @@ static void ui_screen_settings_update_timeout_labels(void)
 
 static void ui_screen_settings_apply(void)
 {
+    /* ui_screen_saver_* owns the backlight: it re-applies the menu level while
+     * the panel is awake and the dimmed level while the clock is on screen, so
+     * the settings page must not force a value on top of that. */
     ui_screen_saver_apply_settings(&s_cfg);
-    if (!s_cfg.display_screen_off_enabled) {
-        (void)display_set_brightness_percent((int)s_cfg.display_brightness);
+}
+
+/* Advance the row cursor below the taller of the two widgets of the row. */
+static void ui_screen_settings_row_advance(lv_obj_t *first, lv_obj_t *second, int16_t gap)
+{
+    if (s_page == NULL) {
+        return;
     }
+
+    lv_obj_update_layout(s_page);
+
+    int16_t bottom = 0;
+    if (first != NULL) {
+        bottom = (int16_t)lv_obj_get_y2(first);
+    }
+    if (second != NULL) {
+        const int16_t other = (int16_t)lv_obj_get_y2(second);
+        if (other > bottom) {
+            bottom = other;
+        }
+    }
+
+    s_row_y = (int16_t)(bottom + 1 + gap);
 }
 
 static uint32_t ui_screen_settings_next_timeout(const uint32_t *values, size_t count, uint32_t current)
@@ -113,6 +149,31 @@ static void ui_screen_settings_brightness_cb(lv_event_t *e)
     char buf[8] = {0};
     snprintf(buf, sizeof(buf), "%u%%", (unsigned)value);
     lv_label_set_text(s_brightness_value, buf);
+    ui_screen_settings_apply();
+}
+
+static void ui_screen_settings_saver_brightness_cb(lv_event_t *e)
+{
+    lv_obj_t *slider = lv_event_get_target_obj(e);
+    uint8_t value = (uint8_t)lv_slider_get_value(slider);
+
+    s_cfg.display_saver_brightness = value;
+    char buf[8] = {0};
+    snprintf(buf, sizeof(buf), "%u%%", (unsigned)value);
+    if (s_saver_brightness_value != NULL) {
+        lv_label_set_text(s_saver_brightness_value, buf);
+    }
+
+    ui_screen_settings_apply();
+
+    /* Dim the panel live while dragging so the level can be judged without
+     * waiting for the screensaver. Released restores the menu level. */
+    (void)display_set_brightness_percent((int)s_cfg.display_saver_brightness);
+}
+
+static void ui_screen_settings_saver_brightness_released_cb(lv_event_t *e)
+{
+    (void)e;
     ui_screen_settings_apply();
 }
 
@@ -212,6 +273,17 @@ static void ui_screen_settings_close_cb(lv_event_t *e)
     }
 }
 
+void ui_screen_settings_handle_screen_clean(void)
+{
+    /* The settings page lives on the active screen: lv_obj_clean() just deleted
+     * it, so only our handles have to go. */
+    s_page = NULL;
+    s_brightness_value = NULL;
+    s_saver_brightness_value = NULL;
+    s_saver_timeout_label = NULL;
+    s_off_timeout_label = NULL;
+}
+
 void ui_screen_settings_open(void)
 {
     runtime_settings_set_defaults(&s_cfg);
@@ -233,14 +305,18 @@ void ui_screen_settings_open(void)
     lv_obj_remove_style_all(s_page);
     lv_obj_set_size(s_page, APP_SCREEN_WIDTH, APP_SCREEN_HEIGHT);
     lv_obj_set_pos(s_page, 0, 0);
-    lv_obj_clear_flag(s_page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(s_page, SETTINGS_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_page, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_page, 0, LV_PART_MAIN);
+    /* Keep vertical scrolling (rows are measured, the display may be short)
+     * but drop the elastic bounce so the page cannot wobble. */
+    lv_obj_set_scroll_dir(s_page, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(s_page, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_clear_flag(s_page, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_set_style_pad_bottom(s_page, 10, LV_PART_MAIN);
 
     const char *title_text = ui_i18n_get("screen.title", "Ustawienia ekranu");
-    lv_obj_t *title = ui_screen_settings_make_label(s_page, title_text, APP_FONT_DISPLAY_28,
-                                                    SETTINGS_TEXT, 24, 18);
+    (void)ui_screen_settings_make_label(s_page, title_text, APP_FONT_DISPLAY_28, SETTINGS_TEXT, 24, 18);
 
     /* Close button */
     lv_obj_t *close_btn = lv_label_create(s_page);
@@ -250,70 +326,114 @@ void ui_screen_settings_open(void)
     lv_obj_align(close_btn, LV_ALIGN_TOP_RIGHT, -20, 18);
     lv_obj_add_event_cb(close_btn, ui_screen_settings_close_cb, LV_EVENT_CLICKED, NULL);
 
+    s_row_y = SETTINGS_ROW_FIRST_Y;
+
     /* Brightness row */
     const char *brightness_text = ui_i18n_get("screen.brightness", "Jasnosc");
-    ui_screen_settings_make_label(s_page, brightness_text, APP_FONT_TEXT_24, SETTINGS_TEXT, 24, 70);
+    lv_obj_t *brightness_label = ui_screen_settings_make_label(s_page, brightness_text, APP_FONT_TEXT_24,
+                                                               SETTINGS_TEXT, 24, s_row_y);
     s_brightness_value = ui_screen_settings_make_label(s_page, "100%", APP_FONT_TEXT_24,
-                                                       SETTINGS_TEXT_DIM, 0, 70);
+                                                       SETTINGS_TEXT_DIM, 0, s_row_y);
     lv_obj_set_width(s_brightness_value, LV_SIZE_CONTENT);
-    lv_obj_align(s_brightness_value, LV_ALIGN_TOP_RIGHT, -24, 70);
+    lv_obj_align(s_brightness_value, LV_ALIGN_TOP_RIGHT, -24, s_row_y);
+    ui_screen_settings_row_advance(brightness_label, s_brightness_value, SETTINGS_LABEL_TO_SLIDER_GAP);
 
     lv_obj_t *brightness_slider = lv_slider_create(s_page);
     lv_obj_set_width(brightness_slider, APP_SCREEN_WIDTH - 48);
-    lv_obj_set_pos(brightness_slider, 24, 100);
+    lv_obj_set_pos(brightness_slider, 24, s_row_y);
     lv_slider_set_range(brightness_slider, 1, 100);
     lv_slider_set_value(brightness_slider, s_cfg.display_brightness, LV_ANIM_OFF);
     lv_obj_add_event_cb(brightness_slider, ui_screen_settings_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    ui_slider_touch_enable(brightness_slider);
+    ui_screen_settings_row_advance(brightness_slider, NULL, SETTINGS_AFTER_SLIDER_GAP);
 
     /* Screensaver row */
     const char *saver_text = ui_i18n_get("screen.screensaver", "Wygaszacz");
-    ui_screen_settings_make_label(s_page, saver_text, APP_FONT_TEXT_24, SETTINGS_TEXT, 24, 140);
+    lv_obj_t *saver_label = ui_screen_settings_make_label(s_page, saver_text, APP_FONT_TEXT_24,
+                                                          SETTINGS_TEXT, 24, s_row_y);
 
     lv_obj_t *saver_switch = lv_switch_create(s_page);
-    lv_obj_align(saver_switch, LV_ALIGN_TOP_RIGHT, -24, 140);
+    lv_obj_align(saver_switch, LV_ALIGN_TOP_RIGHT, -24, s_row_y);
     if (s_cfg.display_screensaver_enabled) {
         lv_obj_add_state(saver_switch, LV_STATE_CHECKED);
     }
     lv_obj_add_event_cb(saver_switch, ui_screen_settings_saver_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    ui_screen_settings_row_advance(saver_label, saver_switch, SETTINGS_AFTER_TOGGLE_GAP);
 
     s_saver_timeout_label = lv_label_create(s_page);
     ui_screen_settings_style_chip(s_saver_timeout_label);
-    lv_obj_set_pos(s_saver_timeout_label, 24, 176);
+    lv_obj_set_pos(s_saver_timeout_label, 24, s_row_y);
     lv_obj_add_event_cb(s_saver_timeout_label, ui_screen_settings_saver_timeout_cb, LV_EVENT_CLICKED, NULL);
+    ui_screen_settings_row_advance(s_saver_timeout_label, NULL, SETTINGS_AFTER_CHIP_GAP);
+
+    /* Screensaver brightness row: how dark the clock dims the panel. It sits
+     * below the screensaver timeout so the clock options stay together. */
+    const char *saver_brightness_text = ui_i18n_get("screen.saver_brightness", "Jasnosc zegara");
+    lv_obj_t *saver_brightness_label = ui_screen_settings_make_label(s_page, saver_brightness_text,
+                                                                     APP_FONT_TEXT_24, SETTINGS_TEXT, 24, s_row_y);
+    s_saver_brightness_value = ui_screen_settings_make_label(s_page, "20%", APP_FONT_TEXT_24,
+                                                             SETTINGS_TEXT_DIM, 0, s_row_y);
+    lv_obj_set_width(s_saver_brightness_value, LV_SIZE_CONTENT);
+    lv_obj_align(s_saver_brightness_value, LV_ALIGN_TOP_RIGHT, -24, s_row_y);
+    ui_screen_settings_row_advance(saver_brightness_label, s_saver_brightness_value,
+                                   SETTINGS_LABEL_TO_SLIDER_GAP);
+
+    lv_obj_t *saver_brightness_slider = lv_slider_create(s_page);
+    lv_obj_set_width(saver_brightness_slider, APP_SCREEN_WIDTH - 48);
+    lv_obj_set_pos(saver_brightness_slider, 24, s_row_y);
+    lv_slider_set_range(saver_brightness_slider, 1, 100);
+    lv_slider_set_value(saver_brightness_slider, s_cfg.display_saver_brightness, LV_ANIM_OFF);
+    lv_obj_add_event_cb(saver_brightness_slider, ui_screen_settings_saver_brightness_cb,
+                        LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(saver_brightness_slider, ui_screen_settings_saver_brightness_released_cb,
+                        LV_EVENT_RELEASED, NULL);
+    ui_slider_touch_enable(saver_brightness_slider);
+    ui_screen_settings_row_advance(saver_brightness_slider, NULL, SETTINGS_AFTER_SLIDER_GAP);
 
     /* Screen-off row */
     const char *off_text = ui_i18n_get("screen.screen_off", "Wylacz ekran");
-    ui_screen_settings_make_label(s_page, off_text, APP_FONT_TEXT_24, SETTINGS_TEXT, 24, 222);
+    lv_obj_t *off_label = ui_screen_settings_make_label(s_page, off_text, APP_FONT_TEXT_24,
+                                                        SETTINGS_TEXT, 24, s_row_y);
 
     lv_obj_t *off_switch = lv_switch_create(s_page);
-    lv_obj_align(off_switch, LV_ALIGN_TOP_RIGHT, -24, 222);
+    lv_obj_align(off_switch, LV_ALIGN_TOP_RIGHT, -24, s_row_y);
     if (s_cfg.display_screen_off_enabled) {
         lv_obj_add_state(off_switch, LV_STATE_CHECKED);
     }
     lv_obj_add_event_cb(off_switch, ui_screen_settings_off_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    ui_screen_settings_row_advance(off_label, off_switch, SETTINGS_AFTER_TOGGLE_GAP);
 
     s_off_timeout_label = lv_label_create(s_page);
     ui_screen_settings_style_chip(s_off_timeout_label);
-    lv_obj_set_pos(s_off_timeout_label, 24, 258);
+    lv_obj_set_pos(s_off_timeout_label, 24, s_row_y);
     lv_obj_add_event_cb(s_off_timeout_label, ui_screen_settings_off_timeout_cb, LV_EVENT_CLICKED, NULL);
+    ui_screen_settings_row_advance(s_off_timeout_label, NULL, SETTINGS_AFTER_CHIP_GAP);
 
     /* Clock / content rows */
     const char *clock_24h_text = ui_i18n_get("screen.clock_24h", "Format 24h");
-    ui_screen_settings_make_toggle(s_page, clock_24h_text, s_cfg.display_clock_24h, 304,
-                                   ui_screen_settings_clock_24h_cb);
+    lv_obj_t *clock_24h_switch = ui_screen_settings_make_toggle(s_page, clock_24h_text, s_cfg.display_clock_24h,
+                                                               s_row_y, ui_screen_settings_clock_24h_cb);
+    ui_screen_settings_row_advance(clock_24h_switch, NULL, SETTINGS_AFTER_TOGGLE_GAP);
 
     const char *seconds_text = ui_i18n_get("screen.show_seconds", "Sekundy");
-    ui_screen_settings_make_toggle(s_page, seconds_text, s_cfg.display_saver_show_seconds, 344,
-                                   ui_screen_settings_seconds_cb);
+    lv_obj_t *seconds_switch = ui_screen_settings_make_toggle(s_page, seconds_text, s_cfg.display_saver_show_seconds,
+                                                             s_row_y, ui_screen_settings_seconds_cb);
+    ui_screen_settings_row_advance(seconds_switch, NULL, SETTINGS_AFTER_TOGGLE_GAP);
 
     const char *date_text = ui_i18n_get("screen.show_date", "Data");
-    ui_screen_settings_make_toggle(s_page, date_text, s_cfg.display_saver_show_date, 384,
-                                   ui_screen_settings_date_cb);
+    lv_obj_t *date_switch = ui_screen_settings_make_toggle(s_page, date_text, s_cfg.display_saver_show_date,
+                                                          s_row_y, ui_screen_settings_date_cb);
+    ui_screen_settings_row_advance(date_switch, NULL, SETTINGS_AFTER_TOGGLE_GAP);
 
     ui_screen_settings_update_timeout_labels();
     char brightness_buf[8] = {0};
     snprintf(brightness_buf, sizeof(brightness_buf), "%u%%", (unsigned)s_cfg.display_brightness);
     lv_label_set_text(s_brightness_value, brightness_buf);
+
+    char saver_brightness_buf[8] = {0};
+    snprintf(saver_brightness_buf, sizeof(saver_brightness_buf), "%u%%",
+             (unsigned)s_cfg.display_saver_brightness);
+    lv_label_set_text(s_saver_brightness_value, saver_brightness_buf);
 
     lv_obj_move_foreground(s_page);
 }

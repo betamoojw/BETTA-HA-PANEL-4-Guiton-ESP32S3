@@ -6,6 +6,12 @@
 #   idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults.s3;sdkconfig.defaults.panels3" ...
 # or the CMake preset "panels3" (see CMakePresets.json).
 
+# --- Compiler optimization ---
+# -O2 (performance) instead of the -Og debug default: -Og was the main reason the
+# panel felt sluggish. -O2 costs some flash, but the WebUI is embedded gzipped now
+# (components/webui/CMakeLists.txt), which more than pays for it.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
 # --- Panel variant selector (drives app_config.h + display/touch init) ---
 CONFIG_APP_PANEL_VARIANT_S3_480=y
 # CONFIG_APP_PANEL_VARIANT_4INCH_720 is not set
@@ -13,3 +19,15 @@ CONFIG_APP_PANEL_VARIANT_S3_480=y
 
 # --- Touch controller (GT911 capacitive on most CYD 4848S040 batches) ---
 CONFIG_ESP_LCD_TOUCH_MAX_POINTS=5
+
+# --- RGB panel DMA recovery ---
+# RESTART_IN_VSYNC resets the GDMA channel on EVERY VBlank. IDF documents that
+# this can itself cause a single-frame desync: if the VSync interrupt runs late,
+# the LCD controller has already read the first bytes and the reset re-sends
+# them, which shows up as a one-frame shift / thin dashes at the left edge.
+# It only needs to be enabled when the DMA categorically cannot keep up.
+# Without it the driver restarts only when it actually detects a shortfall
+# (bb_eof_count < expect_eof_count), so healthy frames are left untouched and
+# a real underrun still self-heals within a frame or two.
+# CONFIG_LCD_RGB_RESTART_IN_VSYNC is not set
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=n

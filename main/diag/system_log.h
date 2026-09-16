@@ -35,6 +35,11 @@ esp_err_t system_log_clear(void);
  * otherwise fail silently. */
 void system_log_write(const char *tag, const char *fmt, ...);
 
+/* Same as system_log_write(), but stored as an informational line so it does
+ * not show up red in the log viewer. The automatic capture hook only forwards
+ * WARN/ERROR lines, so INFO diagnostics have to be written explicitly. */
+void system_log_write_info(const char *tag, const char *fmt, ...);
+
 #ifdef __cplusplus
 }
 #endif

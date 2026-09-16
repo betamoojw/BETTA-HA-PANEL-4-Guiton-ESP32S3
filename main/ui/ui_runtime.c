@@ -16,6 +16,8 @@
 
 #include "app_config.h"
 #include "app_events.h"
+#include "app_task.h"
+#include "diag/system_log.h"
 #include "drivers/display_init.h"
 #include "ha/ha_client.h"
 #include "ha/ha_model.h"
@@ -26,6 +28,11 @@
 #include "ui/ui_memory.h"
 #include "ui/ui_music_page.h"
 #include "ui/ui_pages.h"
+#include "ui/ui_page_style.h"
+#include "ui/ui_page_transition.h"
+#include "ui/ui_press_feedback.h"
+#include "ui/ui_theme_router.h"
+#include "ui/ui_value_anim.h"
 #include "ui/ui_screen_saver.h"
 #include "ui/ui_widget_factory.h"
 #include "ui/theme/theme_default.h"
@@ -66,10 +73,11 @@ static void ui_runtime_on_page_shown(const char *page_id, uint16_t index)
         }
     }
     ui_runtime_update_widget_visibility(page_id, true);
+    /* A page may carry its own theme ("page_theme"); switching it is deferred to
+     * the UI loop so the pages are never rebuilt from inside this callback. */
+    ui_theme_router_notify_page_shown(page_id);
 }
 static TaskHandle_t s_ui_task = NULL;
-/* Incremented at the top of the UI task loop. The system log watchdog restarts
- * the panel if this value stops advancing (UI task stuck holding the LVGL lock). */
 static volatile uint32_t s_heartbeat = 0;
 static ha_state_t s_state_scratch;
 static bool s_initialized = false;
@@ -125,6 +133,23 @@ typedef struct {
     bool ha_initial_sync_done;
 } ui_topbar_cache_t;
 static ui_topbar_cache_t s_topbar_cache = {0};
+/* Set when a layout reload could not take the display lock; the UI task loop
+ * retries so a saved layout is never silently dropped. */
+static bool s_layout_reload_pending = false;
+static int64_t s_layout_reload_retry_ms = 0;
+/* Page the next rebuild should show: set by request_layout_reload_on_page() so
+ * a theme change does not throw the user back to the first page. */
+static char s_restore_page_id[APP_MAX_PAGE_ID_LEN];
+static bool s_restore_page_id_valid = false;
+
+/* How long a layout rebuild waits for the display lock. The render task only
+ * holds it for one frame, so this is generous. */
+#define UI_LAYOUT_LOCK_TIMEOUT_MS 2000
+#define UI_LAYOUT_RETRY_INTERVAL_MS 250
+#define UI_LAYOUT_PUBLISH_TIMEOUT_MS 200
+
+static esp_err_t ui_runtime_apply_layout_locked(const char *layout_json);
+
 #if APP_UI_TEST_WEATHER_ICON_OVERLAY
 static lv_obj_t *s_weather_icon_overlay = NULL;
 #endif
@@ -164,6 +189,24 @@ static ui_widget_size_limits_t ui_runtime_widget_size_limits(const char *type)
 #else
         limits.min_w = 120;
         limits.min_h = 80;
+#endif
+    } else if (strcmp(type, "alarm_tile") == 0) {
+#if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
+        limits.min_w = 150;
+        limits.min_h = 110;
+#else
+        limits.min_w = 200;
+        limits.min_h = 140;
+#endif
+    } else if (strcmp(type, "clock_alarm") == 0) {
+        /* Must fit the clock plus the optional date row; the date row is
+         * dropped automatically on small tiles. */
+#if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
+        limits.min_w = 110;
+        limits.min_h = 80;
+#else
+        limits.min_w = 150;
+        limits.min_h = 110;
 #endif
     } else if (strcmp(type, "button") == 0) {
 #if defined(CONFIG_APP_PANEL_VARIANT_S3_480)
@@ -510,6 +553,8 @@ static void ui_runtime_apply_all_states_preserve_missing(void)
     }
 }
 
+static void ui_runtime_copy_json_string(cJSON *obj, const char *key, char *dst, size_t dst_size);
+
 static bool ui_runtime_widget_from_json(cJSON *widget_json, ui_widget_def_t *out)
 {
     cJSON *id = cJSON_GetObjectItemCaseSensitive(widget_json, "id");
@@ -533,13 +578,27 @@ static bool ui_runtime_widget_from_json(cJSON *widget_json, ui_widget_def_t *out
     cJSON *binary_text_on = cJSON_GetObjectItemCaseSensitive(widget_json, "binary_text_on");
     cJSON *binary_text_off = cJSON_GetObjectItemCaseSensitive(widget_json, "binary_text_off");
     cJSON *binary_show_title = cJSON_GetObjectItemCaseSensitive(widget_json, "binary_show_title");
+    cJSON *alarm_code = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_code");
+    cJSON *alarm_modes = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_modes");
+    cJSON *alarm_ask_code = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_ask_code");
+    cJSON *alarm_show_sensors = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_show_sensors");
+    cJSON *alarm_show_bypassed = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_show_bypassed");
+    cJSON *alarm_force_arm = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_force_arm");
+    cJSON *alarm_skip_delay = cJSON_GetObjectItemCaseSensitive(widget_json, "alarm_skip_delay");
+    cJSON *clock_show_seconds = cJSON_GetObjectItemCaseSensitive(widget_json, "clock_show_seconds");
+    cJSON *clock_show_date = cJSON_GetObjectItemCaseSensitive(widget_json, "clock_show_date");
     cJSON *sensor_value_color = cJSON_GetObjectItemCaseSensitive(widget_json, "sensor_value_color");
+    cJSON *tile_border_width = cJSON_GetObjectItemCaseSensitive(widget_json, "tile_border_width");
+    cJSON *tile_radius = cJSON_GetObjectItemCaseSensitive(widget_json, "tile_radius");
+    cJSON *tile_opacity = cJSON_GetObjectItemCaseSensitive(widget_json, "tile_opacity");
+    cJSON *tile_shadow = cJSON_GetObjectItemCaseSensitive(widget_json, "tile_shadow");
     cJSON *rect = cJSON_GetObjectItemCaseSensitive(widget_json, "rect");
     if (!cJSON_IsString(id) || !cJSON_IsString(type) || !cJSON_IsObject(rect)) {
         return false;
     }
 
-    const bool requires_entity = (strcmp(type->valuestring, "empty_tile") != 0);
+    const bool requires_entity = (strcmp(type->valuestring, "empty_tile") != 0) &&
+                                 (strcmp(type->valuestring, "clock_alarm") != 0);
     if (requires_entity && !cJSON_IsString(entity_id)) {
         return false;
     }
@@ -611,8 +670,81 @@ static bool ui_runtime_widget_from_json(cJSON *widget_json, ui_widget_def_t *out
     if (cJSON_IsBool(binary_show_title)) {
         out->binary_show_title = cJSON_IsTrue(binary_show_title);
     }
+    if (cJSON_IsString(alarm_code) && alarm_code->valuestring != NULL) {
+        snprintf(out->alarm_code, sizeof(out->alarm_code), "%s", alarm_code->valuestring);
+    }
+    if (cJSON_IsString(alarm_modes) && alarm_modes->valuestring != NULL) {
+        snprintf(out->alarm_modes, sizeof(out->alarm_modes), "%s", alarm_modes->valuestring);
+    }
+    if (cJSON_IsBool(alarm_ask_code)) {
+        out->alarm_ask_code = cJSON_IsTrue(alarm_ask_code);
+    }
+    ui_runtime_copy_json_string(widget_json, "alarm_backend", out->alarm_backend, sizeof(out->alarm_backend));
+    ui_runtime_copy_json_string(widget_json, "alarm_zone_label", out->alarm_zone_label,
+        sizeof(out->alarm_zone_label));
+    out->alarm_show_sensors = true;
+    if (cJSON_IsBool(alarm_show_sensors)) {
+        out->alarm_show_sensors = cJSON_IsTrue(alarm_show_sensors);
+    }
+    out->alarm_show_bypassed = true;
+    if (cJSON_IsBool(alarm_show_bypassed)) {
+        out->alarm_show_bypassed = cJSON_IsTrue(alarm_show_bypassed);
+    }
+    out->alarm_force_arm = true;
+    if (cJSON_IsBool(alarm_force_arm)) {
+        out->alarm_force_arm = cJSON_IsTrue(alarm_force_arm);
+    }
+    if (cJSON_IsBool(alarm_skip_delay)) {
+        out->alarm_skip_delay = cJSON_IsTrue(alarm_skip_delay);
+    }
+    if (cJSON_IsBool(clock_show_seconds)) {
+        out->clock_show_seconds = cJSON_IsTrue(clock_show_seconds);
+    }
+    if (cJSON_IsBool(clock_show_date)) {
+        out->clock_show_date = cJSON_IsTrue(clock_show_date);
+    }
     if (cJSON_IsString(sensor_value_color) && sensor_value_color->valuestring != NULL) {
         snprintf(out->sensor_value_color, sizeof(out->sensor_value_color), "%s", sensor_value_color->valuestring);
+    }
+    ui_runtime_copy_json_string(widget_json, "tile_bg_color", out->tile_bg_color, sizeof(out->tile_bg_color));
+    ui_runtime_copy_json_string(widget_json, "tile_bg_grad_color", out->tile_bg_grad_color,
+        sizeof(out->tile_bg_grad_color));
+    ui_runtime_copy_json_string(widget_json, "tile_bg_grad_dir", out->tile_bg_grad_dir, sizeof(out->tile_bg_grad_dir));
+    ui_runtime_copy_json_string(widget_json, "tile_border_color", out->tile_border_color,
+        sizeof(out->tile_border_color));
+    ui_runtime_copy_json_string(widget_json, "tile_text_color", out->tile_text_color, sizeof(out->tile_text_color));
+    ui_runtime_copy_json_string(widget_json, "tile_title_color", out->tile_title_color,
+        sizeof(out->tile_title_color));
+    ui_runtime_copy_json_string(widget_json, "tile_label_color", out->tile_label_color,
+        sizeof(out->tile_label_color));
+    ui_runtime_copy_json_string(widget_json, "tile_value_color", out->tile_value_color,
+        sizeof(out->tile_value_color));
+    ui_runtime_copy_json_string(widget_json, "tile_icon_color", out->tile_icon_color, sizeof(out->tile_icon_color));
+    ui_runtime_copy_json_string(widget_json, "tile_font_scale", out->tile_font_scale, sizeof(out->tile_font_scale));
+    if (out->tile_bg_grad_dir[0] == '\0') {
+        snprintf(out->tile_bg_grad_dir, sizeof(out->tile_bg_grad_dir), "%s", "none");
+    }
+    if (out->tile_font_scale[0] == '\0') {
+        snprintf(out->tile_font_scale, sizeof(out->tile_font_scale), "%s", "auto");
+    }
+    if (out->alarm_backend[0] == '\0') {
+        snprintf(out->alarm_backend, sizeof(out->alarm_backend), "%s", "auto");
+    }
+    out->tile_border_width = -1;
+    if (cJSON_IsNumber(tile_border_width)) {
+        out->tile_border_width = tile_border_width->valueint;
+    }
+    out->tile_radius = -1;
+    if (cJSON_IsNumber(tile_radius)) {
+        out->tile_radius = tile_radius->valueint;
+    }
+    out->tile_opacity = -1;
+    if (cJSON_IsNumber(tile_opacity)) {
+        out->tile_opacity = tile_opacity->valueint;
+    }
+    out->tile_shadow = false;
+    if (cJSON_IsBool(tile_shadow)) {
+        out->tile_shadow = cJSON_IsTrue(tile_shadow);
     }
     out->x = x->valueint;
     out->y = y->valueint;
@@ -730,7 +862,42 @@ static bool ui_runtime_is_background_widget_type(const char *type)
     return type != NULL && strcmp(type, "empty_tile") == 0;
 }
 
+/* Reads the optional per-page background ("page_*" keys). A page without any of
+ * them gets an empty style, which leaves the page container untinted. */
+static void ui_runtime_page_style_from_json(cJSON *page_json, ui_page_style_t *out)
+{
+    ui_page_style_init(out);
+    if (out == NULL) {
+        return;
+    }
+    ui_runtime_copy_json_string(page_json, "page_bg_color", out->bg_color, sizeof(out->bg_color));
+    ui_runtime_copy_json_string(page_json, "page_bg_grad_color", out->bg_grad_color, sizeof(out->bg_grad_color));
+    ui_runtime_copy_json_string(page_json, "page_bg_grad_dir", out->bg_grad_dir, sizeof(out->bg_grad_dir));
+    if (out->bg_grad_dir[0] == '\0') {
+        snprintf(out->bg_grad_dir, sizeof(out->bg_grad_dir), "%s", "none");
+    }
+
+    cJSON *wallpaper = cJSON_GetObjectItemCaseSensitive(page_json, "page_wallpaper");
+    out->wallpaper = cJSON_IsBool(wallpaper) && cJSON_IsTrue(wallpaper);
+
+    cJSON *dim = cJSON_GetObjectItemCaseSensitive(page_json, "page_dim");
+    out->dim = cJSON_IsNumber(dim) ? dim->valueint : 0;
+}
+
 esp_err_t ui_runtime_load_layout(const char *layout_json)
+{
+    if (!display_lock(UI_LAYOUT_LOCK_TIMEOUT_MS)) {
+        ESP_LOGW(TAG_UI, "Layout load: display lock busy");
+        return ESP_ERR_TIMEOUT;
+    }
+    esp_err_t err = ui_runtime_apply_layout_locked(layout_json);
+    display_unlock();
+    return err;
+}
+
+/* Builds the whole UI from layout_json. The display lock MUST already be held:
+ * page/widget creation and deletion must not race with the LVGL render task. */
+static esp_err_t ui_runtime_apply_layout_locked(const char *layout_json)
 {
     if (!s_initialized || layout_json == NULL || s_widgets == NULL || s_energy_pages == NULL || s_music_pages == NULL) {
         return ESP_ERR_INVALID_STATE;
@@ -746,13 +913,12 @@ esp_err_t ui_runtime_load_layout(const char *layout_json)
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (!display_lock(0)) {
-        cJSON_Delete(root);
-        return ESP_ERR_TIMEOUT;
-    }
-
     s_topbar_cache.valid = false;
     ui_pages_reset();
+    /* The page containers were just deleted: forget the wallpaper pages and the
+     * per-page theme overrides, both are re-read below. */
+    ui_page_style_reset();
+    ui_theme_router_reset_pages();
     memset(s_widgets, 0, APP_MAX_WIDGETS_TOTAL * sizeof(*s_widgets));
     s_widget_count = 0;
     memset(s_energy_pages, 0, APP_MAX_PAGES * sizeof(*s_energy_pages));
@@ -776,6 +942,17 @@ esp_err_t ui_runtime_load_layout(const char *layout_json)
         if (page_container == NULL) {
             continue;
         }
+
+        /* Background colour / gradient / wallpaper for this page. */
+        ui_page_style_t page_style;
+        ui_runtime_page_style_from_json(page, &page_style);
+        ui_page_style_apply(page_container, &page_style);
+
+        /* Optional per-page theme override: the page is painted with it as soon
+         * as it becomes visible (see ui_theme_router). */
+        char page_theme[APP_MAX_THEME_ID_LEN];
+        ui_runtime_copy_json_string(page, "page_theme", page_theme, sizeof(page_theme));
+        ui_theme_router_set_page_theme(page_id->valuestring, page_theme);
 
         bool is_energy_page = cJSON_IsString(page_type) && page_type->valuestring != NULL &&
                               strcmp(page_type->valuestring, "energy_dashboard") == 0;
@@ -847,22 +1024,36 @@ esp_err_t ui_runtime_load_layout(const char *layout_json)
     cJSON_Delete(root);
 
     if (ui_pages_count() > 0) {
-        ui_pages_show_index(0);
+        size_t index = 0;
+        if (s_restore_page_id_valid) {
+            s_restore_page_id_valid = false;
+            uint16_t count = ui_pages_count();
+            bool found = false;
+            for (uint16_t i = 0; i < count; i++) {
+                const char *id = ui_pages_id_at(i);
+                if (id != NULL && strcmp(id, s_restore_page_id) == 0) {
+                    index = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                ESP_LOGW(TAG_UI, "layout rebuild: page %s is gone, showing the first one", s_restore_page_id);
+            }
+            s_restore_page_id[0] = '\0';
+        }
+        ui_pages_show_index(index);
     }
     ui_runtime_apply_all_states();
     ui_runtime_refresh_topbar();
-    display_unlock();
     ESP_LOGI(TAG_UI, "Layout loaded: %u widgets", (unsigned)s_widget_count);
     return ESP_OK;
 }
 
 esp_err_t ui_runtime_reload_layout(void)
 {
-    /* Rebuild theme styles so that a live theme change is picked up by the
-     * newly created widgets. Safe: must be called from the UI task under the
-     * display lock, which is the case when triggered via EV_LAYOUT_UPDATED. */
-    theme_default_rebuild_styles();
-
+    /* Reads NVS without the display lock: the file system/flash access can take
+     * a while and holding the lock during it would freeze the render task. */
     char *json = NULL;
     esp_err_t err = layout_store_load(&json);
     if (err != ESP_OK || json == NULL) {
@@ -871,9 +1062,74 @@ esp_err_t ui_runtime_reload_layout(void)
             return ESP_ERR_NO_MEM;
         }
     }
-    err = ui_runtime_load_layout(json);
+
+    /* The whole rebuild (theme styles + page/widget recreation) has to run under
+     * the display lock: theme_default_rebuild_styles() resets LVGL styles that
+     * are attached to live objects (widgets, pages), and the page teardown
+     * deletes objects the render task may be reading. */
+    if (!display_lock(UI_LAYOUT_LOCK_TIMEOUT_MS)) {
+        free(json);
+        s_layout_reload_pending = true;
+        ESP_LOGW(TAG_UI, "Layout reload: display lock busy, retrying");
+        return ESP_ERR_TIMEOUT;
+    }
+
+    int64_t t0 = esp_timer_get_time() / 1000;
+    theme_default_rebuild_styles();
+    int64_t t1 = esp_timer_get_time() / 1000;
+    ui_runtime_kick_heartbeat();
+    err = ui_runtime_apply_layout_locked(json);
+    int64_t t2 = esp_timer_get_time() / 1000;
+    display_unlock();
     free(json);
+
+    s_layout_reload_pending = false;
+    system_log_write_info(TAG_UI, "layout reload ok=%d (theme %lld ms, build %lld ms)",
+                          (int)(err == ESP_OK), (long long)(t1 - t0), (long long)(t2 - t1));
     return err;
+}
+
+esp_err_t ui_runtime_request_layout_reload(void)
+{
+    app_event_t event = {.type = EV_LAYOUT_UPDATED};
+    if (app_events_publish(&event, pdMS_TO_TICKS(UI_LAYOUT_PUBLISH_TIMEOUT_MS))) {
+        /* The UI task applies it asynchronously. */
+        system_log_write_info(TAG_UI, "layout reload queued (async)");
+        return ESP_OK;
+    }
+
+    /* The event queue is saturated (UI task busy or not draining). Applying the
+     * layout here keeps the caller honest: it reports the real outcome instead
+     * of silently leaving the old look on screen. */
+    ESP_LOGW(TAG_UI, "Layout reload event queue busy, applying synchronously");
+    esp_err_t err = ui_runtime_reload_layout();
+    if (err == ESP_ERR_TIMEOUT) {
+        /* Display lock contention: the UI task loop retries until it succeeds. */
+        return ESP_OK;
+    }
+    system_log_write_info(TAG_UI, "layout reload applied synchronously result=%s", esp_err_to_name(err));
+    return err;
+}
+
+esp_err_t ui_runtime_request_layout_reload_on_page(const char *page_id)
+{
+    if (page_id != NULL && page_id[0] != '\0') {
+        snprintf(s_restore_page_id, sizeof(s_restore_page_id), "%s", page_id);
+        s_restore_page_id_valid = true;
+    }
+
+    /* Always asynchronous: the caller may be a page show callback, and
+     * rebuilding there would delete the pages under the caller's feet. */
+    app_event_t event = {.type = EV_LAYOUT_UPDATED};
+    if (app_events_publish(&event, pdMS_TO_TICKS(UI_LAYOUT_PUBLISH_TIMEOUT_MS))) {
+        system_log_write_info(TAG_UI, "layout reload queued (page %s)",
+                              s_restore_page_id_valid ? s_restore_page_id : "-");
+        return ESP_OK;
+    }
+    /* The UI task retries pending reloads on its own schedule. */
+    s_layout_reload_pending = true;
+    system_log_write_info(TAG_UI, "layout reload deferred (event queue busy)");
+    return ESP_OK;
 }
 
 static void ui_runtime_handle_event(const app_event_t *event)
@@ -951,6 +1207,16 @@ static void ui_runtime_task(void *arg)
         }
 
         int64_t now_ms = esp_timer_get_time() / 1000;
+
+        /* Per-page theme overrides and the automatic day/night theme switch.
+         * Runs on this task, so it may touch the palette and the layout. */
+        ui_theme_router_tick();
+
+        if (s_layout_reload_pending && (now_ms - s_layout_reload_retry_ms) >= UI_LAYOUT_RETRY_INTERVAL_MS) {
+            s_layout_reload_retry_ms = now_ms;
+            (void)ui_runtime_reload_layout();
+        }
+
         uint32_t model_revision = ha_model_state_revision();
         if (model_revision != s_last_model_revision) {
             s_last_model_revision = model_revision;
@@ -1005,6 +1271,9 @@ esp_err_t ui_runtime_init(void)
     theme_default_init();
     ui_pages_init();
     ui_screen_saver_init();
+    ui_page_transition_init();
+    ui_press_feedback_init();
+    ui_value_anim_init();
     ui_pages_set_show_callback(ui_runtime_on_page_shown);
     ui_runtime_show_weather_icon_overlay();
     ui_runtime_refresh_topbar();
@@ -1031,7 +1300,7 @@ esp_err_t ui_runtime_start(void)
     }
 
     BaseType_t created =
-        xTaskCreate(ui_runtime_task, "ui_runtime", APP_UI_TASK_STACK, NULL, APP_UI_TASK_PRIO, &s_ui_task);
+        app_task_create(ui_runtime_task, "ui_runtime", APP_UI_TASK_STACK, NULL, APP_UI_TASK_PRIO, &s_ui_task);
     return (created == pdPASS) ? ESP_OK : ESP_FAIL;
 }
 
@@ -1043,4 +1312,11 @@ bool ui_runtime_is_running(void)
 uint32_t ui_runtime_get_heartbeat(void)
 {
     return s_heartbeat;
+}
+
+void ui_runtime_kick_heartbeat(void)
+{
+    /* Long but healthy rebuilds (large layouts, slow PSRAM) must not trip the
+     * UI watchdog: report progress from phase boundaries instead. */
+    s_heartbeat++;
 }

@@ -15,13 +15,25 @@
 #include "mqtt_client.h"
 
 #include "app_config.h"
+#include "app_events.h"
 #include "drivers/display_init.h"
+#include "ui/ui_page_transition.h"
+#include "ui/ui_pages.h"
+#include "ui/ui_press_feedback.h"
 #include "ui/ui_screen_saver.h"
+#include "ui/ui_value_anim.h"
 #include "util/log_tags.h"
+
+#include "esp_crt_bundle.h"
+#include "lwip/sockets.h"
 
 #define MQTT_URI_MAX_LEN (APP_MQTT_HOST_MAX_LEN + 16)
 #define MQTT_TOPIC_MAX_LEN 96
 #define MQTT_DISCOVERY_TOPIC_MAX_LEN 224
+
+/* Broker URI scheme, without the "://" separator. */
+#define MQTT_SCHEME_PLAIN "mqtt"
+#define MQTT_SCHEME_TLS "mqtts"
 
 typedef struct {
     const char *object_id;
@@ -58,6 +70,7 @@ static volatile bool s_connected = false;
 static bool s_have_applied = false;
 static char s_applied_host[APP_MQTT_HOST_MAX_LEN];
 static uint16_t s_applied_port = 0;
+static bool s_applied_use_tls = false;
 static char s_applied_username[APP_MQTT_USERNAME_MAX_LEN];
 static char s_applied_password[APP_MQTT_PASSWORD_MAX_LEN];
 static char s_applied_prefix[APP_MQTT_DISCOVERY_PREFIX_MAX_LEN];
@@ -104,7 +117,7 @@ static void panel_mqtt_derive_host(const runtime_settings_t *settings, char *out
     }
 
     /* No explicit broker: derive the host from the HA WebSocket URL
-     * (e.g. ws://192.168.1.10:8123/api/websocket -> 192.168.1.10). */
+     * (e.g. ws://homeassistant.local:8123/api/websocket -> homeassistant.local). */
     const char *ws = settings->ha_ws_url;
     const char *scheme = strstr(ws, "://");
     if (scheme == NULL) {
@@ -130,6 +143,12 @@ static void panel_mqtt_derive_host(const runtime_settings_t *settings, char *out
     out[len] = '\0';
 }
 
+static bool panel_mqtt_host_is_ipv4(const char *host)
+{
+    struct in_addr addr;
+    return inet_pton(AF_INET, host, &addr) == 1;
+}
+
 static bool panel_mqtt_build_config(const runtime_settings_t *settings)
 {
     char host[APP_MQTT_HOST_MAX_LEN];
@@ -139,7 +158,13 @@ static bool panel_mqtt_build_config(const runtime_settings_t *settings)
         return false;
     }
 
-    snprintf(s_broker_uri, sizeof(s_broker_uri), "mqtt://%s:%u", host, (unsigned)settings->mqtt_port);
+    const bool use_tls = settings->mqtt_use_tls;
+    snprintf(s_broker_uri,
+             sizeof(s_broker_uri),
+             "%s://%s:%u",
+             use_tls ? MQTT_SCHEME_TLS : MQTT_SCHEME_PLAIN,
+             host,
+             (unsigned)settings->mqtt_port);
     snprintf(s_username, sizeof(s_username), "%s", settings->mqtt_username);
     snprintf(s_password, sizeof(s_password), "%s", settings->mqtt_password);
     snprintf(s_discovery_prefix, sizeof(s_discovery_prefix), "%s",
@@ -158,6 +183,24 @@ static bool panel_mqtt_build_config(const runtime_settings_t *settings)
     s_cfg.session.keepalive = 60;
     s_cfg.network.disable_auto_reconnect = false;
 
+    /* Verification is configured explicitly on every (re)build because the
+     * config struct is reused when the client is reconfigured live. */
+    if (use_tls) {
+        s_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+        /* A self-hosted broker is normally reached by IP address, and its
+         * certificate rarely carries that address in the SAN list. Skip only
+         * the name check in that case; the chain is still verified against
+         * the bundled root CAs. */
+        s_cfg.broker.verification.skip_cert_common_name_check = panel_mqtt_host_is_ipv4(host);
+        ESP_LOGI(TAG_MQTT,
+                 "TLS enabled (broker '%s', CN check %s)",
+                 host,
+                 s_cfg.broker.verification.skip_cert_common_name_check ? "skipped" : "enforced");
+    } else {
+        s_cfg.broker.verification.crt_bundle_attach = NULL;
+        s_cfg.broker.verification.skip_cert_common_name_check = false;
+    }
+
     /* The MQTT task handles incoming commands synchronously inside the event
      * loop. The command path stacks two runtime_settings_t (~1.5 KB each) plus
      * several nested NVS/cJSON locals on top of the 6 KB default task stack,
@@ -174,6 +217,7 @@ static void panel_mqtt_record_applied(const runtime_settings_t *settings)
     panel_mqtt_derive_host(settings, host, sizeof(host));
     snprintf(s_applied_host, sizeof(s_applied_host), "%s", host);
     s_applied_port = settings->mqtt_port;
+    s_applied_use_tls = settings->mqtt_use_tls;
     snprintf(s_applied_username, sizeof(s_applied_username), "%s", settings->mqtt_username);
     snprintf(s_applied_password, sizeof(s_applied_password), "%s", settings->mqtt_password);
     snprintf(s_applied_prefix, sizeof(s_applied_prefix), "%s", s_discovery_prefix);
@@ -192,6 +236,7 @@ static bool panel_mqtt_config_changed(const runtime_settings_t *settings)
                              : APP_MQTT_DISCOVERY_PREFIX_DEFAULT;
     return strcmp(host, s_applied_host) != 0 ||
            settings->mqtt_port != s_applied_port ||
+           settings->mqtt_use_tls != s_applied_use_tls ||
            strcmp(settings->mqtt_username, s_applied_username) != 0 ||
            strcmp(settings->mqtt_password, s_applied_password) != 0 ||
            strcmp(prefix, s_applied_prefix) != 0;
@@ -249,6 +294,21 @@ static void panel_mqtt_apply_command(esp_mqtt_client_handle_t client, const char
         return;
     }
 
+    if (strcmp(key, "page") == 0) {
+        /* Switch the visible page by id; the UI task owns the actual swap. */
+        if (payload[0] == '\0') {
+            ESP_LOGW(TAG_MQTT, "page command needs a page id");
+            return;
+        }
+        app_event_t event = {0};
+        event.type = EV_UI_NAVIGATE;
+        strlcpy(event.data.navigate.page_id, payload, sizeof(event.data.navigate.page_id));
+        if (!app_events_publish(&event, pdMS_TO_TICKS(100))) {
+            ESP_LOGW(TAG_MQTT, "page command dropped, event queue busy");
+        }
+        return;
+    }
+
     runtime_settings_t s;
     if (runtime_settings_load(&s) != ESP_OK) {
         runtime_settings_set_defaults(&s);
@@ -283,10 +343,46 @@ static void panel_mqtt_apply_command(esp_mqtt_client_handle_t client, const char
             s.display_saver_show_date = b;
             changed = true;
         }
+    } else if (strcmp(key, "topbar_show_clock") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_show_clock) {
+            s.display_topbar_show_clock = b;
+            changed = true;
+        }
+    } else if (strcmp(key, "topbar_show_date") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_show_date) {
+            s.display_topbar_show_date = b;
+            changed = true;
+        }
+    } else if (strcmp(key, "topbar_show_gear") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_show_gear) {
+            s.display_topbar_show_gear = b;
+            changed = true;
+        }
+    } else if (strcmp(key, "topbar_show_status") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_show_status) {
+            s.display_topbar_show_status = b;
+            changed = true;
+        }
+    } else if (strcmp(key, "topbar_icon_text") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_icon_text) {
+            s.display_topbar_icon_text = b;
+            changed = true;
+        }
+    } else if (strcmp(key, "topbar_custom_colors") == 0 && panel_mqtt_parse_bool(payload, &b)) {
+        if (b != s.display_topbar_custom_colors) {
+            s.display_topbar_custom_colors = b;
+            changed = true;
+        }
     } else if (strcmp(key, "brightness") == 0 && panel_mqtt_parse_int(payload, &n)) {
         n = panel_mqtt_clamp(n, 1, 100);
         if ((uint8_t)n != s.display_brightness) {
             s.display_brightness = (uint8_t)n;
+            changed = true;
+        }
+    } else if (strcmp(key, "saver_brightness") == 0 && panel_mqtt_parse_int(payload, &n)) {
+        n = panel_mqtt_clamp(n, 1, 100);
+        if ((uint8_t)n != s.display_saver_brightness) {
+            s.display_saver_brightness = (uint8_t)n;
             changed = true;
         }
     } else if (strcmp(key, "screensaver_timeout_sec") == 0 && panel_mqtt_parse_int(payload, &n)) {
@@ -301,6 +397,60 @@ static void panel_mqtt_apply_command(esp_mqtt_client_handle_t client, const char
             s.display_screen_off_timeout_sec = (uint32_t)n;
             changed = true;
         }
+    } else if (strcmp(key, "page_transition") == 0) {
+        char transition[APP_DISPLAY_PAGE_TRANSITION_MAX_LEN] = {0};
+        if (!runtime_settings_page_transition_from_string(payload, transition, sizeof(transition))) {
+            ESP_LOGW(TAG_MQTT, "page_transition must be none, fade, slide, slide_up or fade_slide");
+            return;
+        }
+        if (strcmp(transition, s.display_page_transition) != 0) {
+            strlcpy(s.display_page_transition, transition, sizeof(s.display_page_transition));
+            changed = true;
+        }
+    } else if (strcmp(key, "page_transition_ms") == 0 && panel_mqtt_parse_int(payload, &n)) {
+        n = panel_mqtt_clamp(n, 0, APP_DISPLAY_PAGE_TRANSITION_MAX_MS);
+        if ((uint16_t)n != s.display_page_transition_ms) {
+            s.display_page_transition_ms = (uint16_t)n;
+            changed = true;
+        }
+    } else if (strcmp(key, "tile_press_fx") == 0) {
+        char press_fx[APP_TILE_PRESS_FX_MAX_LEN] = {0};
+        if (!runtime_settings_tile_press_fx_from_string(payload, press_fx, sizeof(press_fx))) {
+            ESP_LOGW(TAG_MQTT, "tile_press_fx must be none, dim, scale or both");
+            return;
+        }
+        if (strcmp(press_fx, s.display_tile_press_fx) != 0) {
+            strlcpy(s.display_tile_press_fx, press_fx, sizeof(s.display_tile_press_fx));
+            changed = true;
+        }
+    } else if (strcmp(key, "tile_press_fx_dim") == 0 && panel_mqtt_parse_int(payload, &n)) {
+        n = panel_mqtt_clamp(n, 0, APP_TILE_PRESS_FX_DIM_MAX);
+        if ((uint8_t)n != s.display_tile_press_fx_dim) {
+            s.display_tile_press_fx_dim = (uint8_t)n;
+            changed = true;
+        }
+    } else if (strcmp(key, "tile_press_fx_scale") == 0 && panel_mqtt_parse_int(payload, &n)) {
+        n = panel_mqtt_clamp(n, APP_TILE_PRESS_FX_SCALE_MIN, APP_TILE_PRESS_FX_SCALE_MAX);
+        if ((uint8_t)n != s.display_tile_press_fx_scale) {
+            s.display_tile_press_fx_scale = (uint8_t)n;
+            changed = true;
+        }
+    } else if (strcmp(key, "value_anim") == 0) {
+        char value_anim[APP_DISPLAY_VALUE_ANIM_MAX_LEN] = {0};
+        if (!runtime_settings_value_anim_from_string(payload, value_anim, sizeof(value_anim))) {
+            ESP_LOGW(TAG_MQTT, "value_anim must be none, fade, slide or count");
+            return;
+        }
+        if (strcmp(value_anim, s.display_value_anim) != 0) {
+            strlcpy(s.display_value_anim, value_anim, sizeof(s.display_value_anim));
+            changed = true;
+        }
+    } else if (strcmp(key, "value_anim_ms") == 0 && panel_mqtt_parse_int(payload, &n)) {
+        n = panel_mqtt_clamp(n, 0, APP_DISPLAY_VALUE_ANIM_MAX_MS);
+        if ((uint16_t)n != s.display_value_anim_ms) {
+            s.display_value_anim_ms = (uint16_t)n;
+            changed = true;
+        }
     } else {
         ESP_LOGW(TAG_MQTT, "unknown command key '%s'", key);
         return;
@@ -309,6 +459,10 @@ static void panel_mqtt_apply_command(esp_mqtt_client_handle_t client, const char
     if (changed) {
         runtime_settings_save(&s);
         ui_screen_saver_apply_settings(&s);
+        ui_page_transition_apply_settings(&s);
+        ui_press_feedback_apply_settings(&s);
+        ui_value_anim_apply_settings(&s);
+        ui_pages_apply_topbar_settings(&s);
         panel_mqtt_publish_state_from(&s, client);
     }
 }
@@ -440,6 +594,24 @@ static void panel_mqtt_add_discovery_entity(esp_mqtt_client_handle_t client,
             cJSON_AddNumberToObject(root, "max", number_max);
             cJSON_AddNumberToObject(root, "step", number_step);
             cJSON_AddStringToObject(root, "mode", "box");
+        } else if (strcmp(component, "select") == 0) {
+            char value_template[128];
+            snprintf(value_template, sizeof(value_template), "{{ value_json.%s }}", command_key);
+            cJSON_AddStringToObject(root, "value_template", value_template);
+
+            size_t name_count = 0;
+            const char *const *names;
+            if (strcmp(command_key, "tile_press_fx") == 0) {
+                names = runtime_settings_tile_press_fx_names(&name_count);
+            } else if (strcmp(command_key, "value_anim") == 0) {
+                names = runtime_settings_value_anim_names(&name_count);
+            } else {
+                names = runtime_settings_page_transition_names(&name_count);
+            }
+            cJSON *options = cJSON_AddArrayToObject(root, "options");
+            for (size_t i = 0; i < name_count; i++) {
+                cJSON_AddItemToArray(options, cJSON_CreateString(names[i]));
+            }
         } else if (strcmp(component, "button") == 0) {
             cJSON_AddStringToObject(root, "payload_press", "PRESS");
         }
@@ -476,6 +648,9 @@ static void panel_mqtt_publish_discovery(esp_mqtt_client_handle_t client)
     snprintf(object_id, sizeof(object_id), "%s_brightness", s_client_id);
     panel_mqtt_add_discovery_entity(client, object_id, "Brightness",
                                     "number", "brightness", 1, 100, 1);
+    snprintf(object_id, sizeof(object_id), "%s_saver_brightness", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Screensaver Brightness",
+                                    "number", "saver_brightness", 1, 100, 1);
     snprintf(object_id, sizeof(object_id), "%s_saver_timeout", s_client_id);
     panel_mqtt_add_discovery_entity(client, object_id, "Screensaver Timeout",
                                     "number", "screensaver_timeout_sec", 5, 3600, 5);
@@ -486,6 +661,51 @@ static void panel_mqtt_publish_discovery(esp_mqtt_client_handle_t client)
     snprintf(object_id, sizeof(object_id), "%s_wake", s_client_id);
     panel_mqtt_add_discovery_entity(client, object_id, "Wake Display",
                                     "button", "wake", 0, 0, 0);
+
+    snprintf(object_id, sizeof(object_id), "%s_page_transition", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Page Transition",
+                                    "select", "page_transition", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_page_transition_ms", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Page Transition Duration",
+                                    "number", "page_transition_ms", 0,
+                                    APP_DISPLAY_PAGE_TRANSITION_MAX_MS, 20);
+    snprintf(object_id, sizeof(object_id), "%s_tile_press_fx", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Tile Press Effect",
+                                    "select", "tile_press_fx", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_tile_press_fx_dim", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Tile Press Dim",
+                                    "number", "tile_press_fx_dim", 0,
+                                    APP_TILE_PRESS_FX_DIM_MAX, 1);
+    snprintf(object_id, sizeof(object_id), "%s_tile_press_fx_scale", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Tile Press Scale",
+                                    "number", "tile_press_fx_scale", APP_TILE_PRESS_FX_SCALE_MIN,
+                                    APP_TILE_PRESS_FX_SCALE_MAX, 1);
+    snprintf(object_id, sizeof(object_id), "%s_value_anim", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Value Animation",
+                                    "select", "value_anim", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_value_anim_ms", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Value Animation Duration",
+                                    "number", "value_anim_ms", 0,
+                                    APP_DISPLAY_VALUE_ANIM_MAX_MS, 20);
+
+    snprintf(object_id, sizeof(object_id), "%s_topbar_clock", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Clock",
+                                    "switch", "topbar_show_clock", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_topbar_date", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Date",
+                                    "switch", "topbar_show_date", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_topbar_gear", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Settings Icon",
+                                    "switch", "topbar_show_gear", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_topbar_status", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Status Icons",
+                                    "switch", "topbar_show_status", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_topbar_icon_text", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Text Icons",
+                                    "switch", "topbar_icon_text", 0, 0, 0);
+    snprintf(object_id, sizeof(object_id), "%s_topbar_custom_colors", s_client_id);
+    panel_mqtt_add_discovery_entity(client, object_id, "Top Bar Own Colours",
+                                    "switch", "topbar_custom_colors", 0, 0, 0);
 }
 
 static void panel_mqtt_publish_state_from(const runtime_settings_t *s, esp_mqtt_client_handle_t client)
@@ -497,8 +717,22 @@ static void panel_mqtt_publish_state_from(const runtime_settings_t *s, esp_mqtt_
     cJSON_AddBoolToObject(root, "saver_show_seconds", s->display_saver_show_seconds);
     cJSON_AddBoolToObject(root, "saver_show_date", s->display_saver_show_date);
     cJSON_AddNumberToObject(root, "brightness", s->display_brightness);
+    cJSON_AddNumberToObject(root, "saver_brightness", s->display_saver_brightness);
     cJSON_AddNumberToObject(root, "screensaver_timeout_sec", (double)s->display_screensaver_timeout_sec);
     cJSON_AddNumberToObject(root, "screen_off_timeout_sec", (double)s->display_screen_off_timeout_sec);
+    cJSON_AddStringToObject(root, "page_transition", s->display_page_transition);
+    cJSON_AddNumberToObject(root, "page_transition_ms", s->display_page_transition_ms);
+    cJSON_AddStringToObject(root, "tile_press_fx", s->display_tile_press_fx);
+    cJSON_AddNumberToObject(root, "tile_press_fx_dim", s->display_tile_press_fx_dim);
+    cJSON_AddNumberToObject(root, "tile_press_fx_scale", s->display_tile_press_fx_scale);
+    cJSON_AddStringToObject(root, "value_anim", s->display_value_anim);
+    cJSON_AddNumberToObject(root, "value_anim_ms", s->display_value_anim_ms);
+    cJSON_AddBoolToObject(root, "topbar_show_clock", s->display_topbar_show_clock);
+    cJSON_AddBoolToObject(root, "topbar_show_date", s->display_topbar_show_date);
+    cJSON_AddBoolToObject(root, "topbar_show_gear", s->display_topbar_show_gear);
+    cJSON_AddBoolToObject(root, "topbar_show_status", s->display_topbar_show_status);
+    cJSON_AddBoolToObject(root, "topbar_icon_text", s->display_topbar_icon_text);
+    cJSON_AddBoolToObject(root, "topbar_custom_colors", s->display_topbar_custom_colors);
 
     char *payload = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -533,6 +767,7 @@ void panel_mqtt_apply_settings(const runtime_settings_t *settings)
         s_started = false;
         s_connected = false;
         s_have_applied = false;
+        s_broker_uri[0] = '\0';
         ESP_LOGI(TAG_MQTT, "disabled");
         return;
     }
@@ -597,4 +832,9 @@ void panel_mqtt_notify_settings_changed(void)
 bool panel_mqtt_is_connected(void)
 {
     return s_connected;
+}
+
+const char *panel_mqtt_broker_uri(void)
+{
+    return s_broker_uri;
 }

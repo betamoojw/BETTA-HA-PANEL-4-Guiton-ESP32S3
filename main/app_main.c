@@ -19,6 +19,7 @@
 #include "api/http_server.h"
 #include "app_config.h"
 #include "app_events.h"
+#include "diag/boot_guard.h"
 #include "diag/system_log.h"
 #include "drivers/display_init.h"
 #include "drivers/touch_init.h"
@@ -30,10 +31,13 @@
 #include "mqtt/panel_mqtt.h"
 #include "net/time_sync.h"
 #include "net/wifi_mgr.h"
+#include "sd/sd_card.h"
 #include "settings/runtime_settings.h"
 #include "ui/ui_boot_splash.h"
 #include "ui/ui_i18n.h"
 #include "ui/ui_runtime.h"
+#include "ui/ui_screen_saver.h"
+#include "ui/ui_theme_router.h"
 #include "ui/theme/theme_store.h"
 #include "util/log_tags.h"
 
@@ -165,12 +169,15 @@ void app_main(void)
     const esp_app_desc_t *app_desc = esp_app_get_description();
     const char *app_version = (app_desc != NULL && app_desc->version[0] != '\0') ? app_desc->version : "unknown";
 
+    boot_guard_init();
+
     ESP_LOGI(TAG_APP, "Booting %s", APP_NAME);
     ESP_LOGI("app_init", "App version: %s", app_version);
 
     ESP_ERROR_CHECK(init_nvs());
     ESP_ERROR_CHECK(init_littlefs());
-    (void)system_log_init(); /* best effort: log capture must not block boot */
+    (void)system_log_init();
+    boot_guard_report_boot();
     ESP_ERROR_CHECK(init_net_stack());
     ESP_ERROR_CHECK(app_events_init());
     ESP_ERROR_CHECK(ha_model_init());
@@ -186,6 +193,13 @@ void app_main(void)
     (void)time_sync_set_timezone(s_runtime_settings.time_tz);
     ESP_ERROR_CHECK(display_init());
     (void)ui_boot_splash_show();
+
+    /* IO47/IO48 are shared with the panel init sequence, so the card can only
+     * be brought up once display_init() released them. */
+    if (s_runtime_settings.sd_enabled) {
+        ui_boot_splash_set_status(ui_i18n_get("boot.mounting_sd", "Mounting microSD card"));
+        (void)sd_card_init();
+    }
 
     ui_boot_splash_set_status(ui_i18n_get("boot.initializing_wifi", "Initializing Wi-Fi"));
 
@@ -261,6 +275,10 @@ void app_main(void)
 
     ESP_ERROR_CHECK(layout_store_init());
     ESP_ERROR_CHECK(theme_store_init());
+    /* theme_store_init() has just re-activated the persisted theme: that is the
+     * global theme the per-page overrides and the day/night schedule build on. */
+    ui_theme_router_init();
+    ui_theme_router_apply_settings(&s_runtime_settings);
     ESP_ERROR_CHECK(http_server_start());
 
     panel_mqtt_init();
@@ -280,6 +298,13 @@ void app_main(void)
         ESP_ERROR_CHECK(ui_runtime_reload_layout());
         ESP_ERROR_CHECK(ui_runtime_start());
         ui_boot_splash_hide();
+
+        /* From here on the screensaver frame follows the microSD card: it is
+         * moved onto a card that is inserted and copied back to internal flash
+         * when the card is pulled, so the picture is never lost.  Registered
+         * only once the UI is up, because the sync needs the loaded frame. */
+        sd_card_set_event_callback(ui_screen_saver_wallpaper_sync);
+        ui_screen_saver_wallpaper_sync(SD_CARD_EVENT_MOUNTED);
 
         ha_client_config_t ha_cfg = {
             .ws_url = s_runtime_settings.ha_ws_url,
@@ -305,4 +330,8 @@ void app_main(void)
     if (xTaskCreate(auto_restart_task, "auto_restart", 3072, NULL, 5, NULL) != pdPASS) {
         ESP_LOGW(TAG_APP, "Failed to create auto-restart task");
     }
+
+    /* Confirms a pending OTA image once the panel is healthy (no-op when the
+     * running image is not awaiting rollback verification). */
+    boot_guard_start_confirm_task();
 }
