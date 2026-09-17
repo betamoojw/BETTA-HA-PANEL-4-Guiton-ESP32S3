@@ -7,7 +7,7 @@
 (4.8" 480×480 touchscreen).** Build your dashboard directly on the device — no YAML
 edits, no firmware rebuilds.
 
-This repository is a **fork of [BETTA HA Panel v0.8.2](https://github.com/CptKirk/BETTA-HA-Panel](https://github.com/cptkirki/BETTA-HA-PANEL?utm_source=chatgpt.com)**
+This repository is a **fork of [BETTA HA Panel v0.8.2]([https://github.com/cptkirki/BETTA-HA-Panel](https://github.com/cptkirki/BETTA-HA-PANEL?utm_source=chatgpt.com](https://github.com/cptkirki/BETTA-HA-PANEL))**
 by **Cpt_Kirk**, extended with a large set of custom features: a much richer
 tile/page appearance engine, seven built-in themes with automatic day/night switching,
 a flip-clock screensaver, six new tile types, deep Home Assistant **Alarmo**
