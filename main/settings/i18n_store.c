@@ -8,8 +8,12 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
+
+extern const uint8_t i18n_zh_cn_json_start[] asm("_binary_i18n_zh_cn_json_start");
+extern const uint8_t i18n_zh_tw_json_start[] asm("_binary_i18n_zh_tw_json_start");
 
 static const char *I18N_BUILTIN_DE =
     "{\"lvgl\":{"
@@ -150,7 +154,8 @@ bool i18n_store_is_builtin_language(const char *language_code)
         return false;
     }
     return strcmp(language_code, "de") == 0 || strcmp(language_code, "en") == 0 || strcmp(language_code, "es") == 0 ||
-           strcmp(language_code, "fr") == 0 || strcmp(language_code, "pl") == 0;
+           strcmp(language_code, "fr") == 0 || strcmp(language_code, "pl") == 0 ||
+           strcmp(language_code, "zh-cn") == 0 || strcmp(language_code, "zh-tw") == 0;
 }
 
 const char *i18n_store_builtin_translation_json(const char *language_code)
@@ -172,6 +177,12 @@ const char *i18n_store_builtin_translation_json(const char *language_code)
     }
     if (strcmp(language_code, "pl") == 0) {
         return I18N_BUILTIN_PL;
+    }
+    if (strcmp(language_code, "zh-cn") == 0) {
+        return (const char *)i18n_zh_cn_json_start;
+    }
+    if (strcmp(language_code, "zh-tw") == 0) {
+        return (const char *)i18n_zh_tw_json_start;
     }
     return NULL;
 }
@@ -333,6 +344,8 @@ esp_err_t i18n_store_list_languages(
     (void)i18n_store_add_language(out_codes, max_codes, &count, "es");
     (void)i18n_store_add_language(out_codes, max_codes, &count, "fr");
     (void)i18n_store_add_language(out_codes, max_codes, &count, "pl");
+    (void)i18n_store_add_language(out_codes, max_codes, &count, "zh-cn");
+    (void)i18n_store_add_language(out_codes, max_codes, &count, "zh-tw");
 
     if (!i18n_store_ensure_dir()) {
         *out_count = count;
