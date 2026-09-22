@@ -710,6 +710,13 @@ void ui_screen_saver_wallpaper_sync(sd_card_event_t event)
     }
 
     if (event == SD_CARD_EVENT_MOUNTED && sd_card_is_mounted()) {
+        /* The card can finish mounting only after the boot-time load already
+         * gave up (hot-plug auto_mount_task fires this event ~3s later).  If no
+         * frame is in memory yet, load it from the card now instead of leaving
+         * the screensaver without a wallpaper until the next manual reload. */
+        if (!s_wallpaper_loaded) {
+            ui_screen_saver_load_wallpaper();
+        }
         if (!wallpaper_file_valid(APP_SD_WALLPAPER_PATH) && s_wallpaper_loaded) {
             if (wallpaper_store_buffer(APP_SD_WALLPAPER_TMP_PATH, APP_SD_WALLPAPER_PATH)) {
                 ESP_LOGI(TAG_SCREEN_SAVER, "wallpaper copied to the microSD card");
