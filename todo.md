@@ -4,7 +4,8 @@ Development To-Do List
 
 Integrate the `lcdmirror` ESP-IDF component:
 
-https://github.com/spangap/lcdmirror
+https://github.com/spangap/lcdmirror 
+or https://github.com/HASwitchPlate/openHASP
 
 The goal is to expose the physical LVGL LCD through a web browser for development, debugging, testing, and remote interaction.
 
