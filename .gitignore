@@ -4,6 +4,7 @@
 build/
 build_*/
 build-panel*/
+release/
 lvgl_design/
 sdkconfig
 sdkconfig.panel*
