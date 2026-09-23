@@ -33,6 +33,18 @@ endchoice
 
 endmenu
 
+config APP_REMOTE_DISPLAY
+    bool "Browser live display and remote touch (development)"
+    depends on APP_PANEL_VARIANT_S3_480
+    default y
+    select HTTPD_WS_SUPPORT
+    select HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT
+    select HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT
+    help
+        Mirror the existing RGB565 full-refresh display to the web editor.
+        Allocates capture buffers only while a viewer is connected. Disable
+        for production builds that should not expose remote display control.
+
 menu "Wi-Fi Station"
 
 config APP_WIFI_SSID

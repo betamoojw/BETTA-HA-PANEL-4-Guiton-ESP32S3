@@ -1,6 +1,6 @@
 Development To-Do List
 
-## 1. Add Browser-Based LVGL LCD Mirroring and Remote Interaction
+## 1. Add Browser-Based LVGL LCD Mirroring and Remote Interaction - Done
 
 Integrate the `lcdmirror` ESP-IDF component:
 

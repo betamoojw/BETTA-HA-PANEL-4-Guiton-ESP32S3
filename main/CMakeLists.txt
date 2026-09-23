@@ -39,6 +39,8 @@ idf_component_register(
         "api/api_wifi.c"
         "api/api_version.c"
         "api/api_screenshot.c"
+        "api/api_remote_display.c"
+        "ui/ui_remote_display.c"
         "api/api_ota.c"
         "api/api_theme.c"
         "api/api_ha_diagnostics.c"

@@ -5844,6 +5844,8 @@ function renderAppVersion() {
 async function loadAppVersion() {
   try {
     const payload = await apiGet("/api/version");
+    document.getElementById("remoteTabBtn").classList.toggle("hidden", payload?.remote_display !== true);
+    document.querySelector(".mode-tabs").classList.toggle("has-remote", payload?.remote_display === true);
     editor.appVersion = typeof payload?.version === "string" ? payload.version : "";
     editor.appProject = typeof payload?.project === "string" ? payload.project : "";
     editor.appScreenW = Number(payload?.screen_w) || 0;
@@ -6799,12 +6801,15 @@ function setActiveSettingsSection(sectionId) {
 
 function setActivePane(pane) {
   setupSettingsWorkspace();
-  editor.activePane = pane === "settings" ? "settings" : "layout";
+  editor.activePane = pane === "remote" ? "remote" : pane === "settings" ? "settings" : "layout";
   const showLayout = editor.activePane === "layout";
+  const showSettings = editor.activePane === "settings";
+  const showRemote = editor.activePane === "remote";
+  window.RemoteDisplay?.setVisible(showRemote);
   el.layoutPane.classList.toggle("hidden", !showLayout);
-  el.settingsPane.classList.toggle("hidden", showLayout);
+  el.settingsPane.classList.toggle("hidden", !showSettings);
   if (el.settingsContentPane) {
-    el.settingsContentPane.classList.toggle("hidden", showLayout);
+    el.settingsContentPane.classList.toggle("hidden", !showSettings);
   }
   if (el.canvasWrap) {
     el.canvasWrap.classList.toggle("hidden", !showLayout);
@@ -6813,12 +6818,13 @@ function setActivePane(pane) {
     el.actionsPanel.classList.toggle("hidden", !showLayout);
   }
   el.layoutTabBtn.classList.toggle("active", showLayout);
-  el.settingsTabBtn.classList.toggle("active", !showLayout);
-  if (showLayout) {
+  el.settingsTabBtn.classList.toggle("active", showSettings);
+  if (!showSettings) {
     clearOtaStatusPoll();
     clearLogsPoll();
     clearDiagnosticsPoll();
-    renderCanvas();
+    if (showLayout) renderCanvas();
+    if (showRemote && el.canvasTitle) el.canvasTitle.textContent = document.getElementById("remoteTabBtn").textContent;
   } else if (editor.ota.status?.running || editor.ota.status?.rebooting) {
     setActiveSettingsSection(editor.activeSettingsSection);
     scheduleOtaStatusPoll();
@@ -11087,6 +11093,7 @@ function renderMusicCanvasPreview(page) {
 }
 
 function renderCanvas() {
+  if (editor.activePane === "remote") return;
   if (editor.activePane === "settings") {
     setActiveSettingsSection(editor.activeSettingsSection);
     return;
@@ -12169,6 +12176,7 @@ function bindUi() {
   }
 
   el.layoutTabBtn.onclick = () => setActivePane("layout");
+  document.getElementById("remoteTabBtn").onclick = () => setActivePane("remote");
   el.settingsTabBtn.onclick = async () => {
     setActivePane("settings");
     await loadSettings(true);
