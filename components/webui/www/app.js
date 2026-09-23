@@ -674,7 +674,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "Enable HA REST fallback (Default: Off, WS-only preferred)",
     "settings.time.heading": "Time",
     "settings.time.ntp_server": "NTP Server",
-    "settings.time.timezone": "Timezone (POSIX TZ)",
+    "settings.time.timezone": "Timezone",
+    "settings.time.search": "Search timezone…",
+    "settings.time.show_zones": "Show timezones",
+    "settings.time.search_hint": "Type part of a city or region, then select a timezone.",
+    "settings.time.no_matches": "No matching timezones",
+    "settings.time.local_time": "Current local time",
+    "settings.time.clock_unavailable": "Device time unavailable or not synchronized",
+    "settings.time.legacy_active": "Existing legacy timezone",
+    "settings.time.legacy_hint": "Existing timezone is preserved. Select a location to replace it.",
+    "settings.time.list_unavailable": "Timezone list unavailable. Reload settings.",
     "settings.ui.heading": "UI",
     "settings.theme.heading": "Theme",
     "settings.ui.language": "Language",
@@ -1348,7 +1357,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "HA REST Fallback aktivieren (Standard: Aus, WS bevorzugt)",
     "settings.time.heading": "Zeit",
     "settings.time.ntp_server": "NTP Server",
-    "settings.time.timezone": "Zeitzone (POSIX TZ)",
+    "settings.time.timezone": "Zeitzone",
+    "settings.time.search": "Zeitzone suchen…",
+    "settings.time.show_zones": "Zeitzonen anzeigen",
+    "settings.time.search_hint": "Gib einen Teil eines Stadt- oder Regionsnamens ein und wähle eine Zeitzone aus.",
+    "settings.time.no_matches": "Keine passenden Zeitzonen",
+    "settings.time.local_time": "Aktuelle Ortszeit",
+    "settings.time.clock_unavailable": "Gerätezeit nicht verfügbar oder noch nicht synchronisiert",
+    "settings.time.legacy_active": "Bisherige Zeitzone im alten Format",
+    "settings.time.legacy_hint": "Die bisherige Zeitzone bleibt erhalten. Wähle einen Ort aus, um sie zu ersetzen.",
+    "settings.time.list_unavailable": "Zeitzonenliste nicht verfügbar. Lade die Einstellungen erneut.",
     "settings.ui.heading": "UI",
     "settings.theme.heading": "Theme",
     "settings.ui.language": "Sprache",
@@ -1651,7 +1669,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "Activar fallback REST de HA (por defecto: off, se prefiere WS)",
     "settings.time.heading": "Hora",
     "settings.time.ntp_server": "Servidor NTP",
-    "settings.time.timezone": "Zona horaria (POSIX TZ)",
+    "settings.time.timezone": "Zona horaria",
+    "settings.time.search": "Buscar zona horaria…",
+    "settings.time.show_zones": "Mostrar zonas horarias",
+    "settings.time.search_hint": "Escribe parte del nombre de una ciudad o región y selecciona una zona horaria.",
+    "settings.time.no_matches": "No hay zonas horarias coincidentes",
+    "settings.time.local_time": "Hora local actual",
+    "settings.time.clock_unavailable": "La hora del dispositivo no está disponible o no está sincronizada",
+    "settings.time.legacy_active": "Zona horaria existente en formato antiguo",
+    "settings.time.legacy_hint": "Se conserva la zona horaria existente. Selecciona una ubicación para reemplazarla.",
+    "settings.time.list_unavailable": "La lista de zonas horarias no está disponible. Vuelve a cargar los ajustes.",
     "settings.ui.heading": "UI",
     "settings.theme.heading": "Tema",
     "settings.ui.language": "Idioma",
@@ -1950,7 +1977,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "Activer le fallback REST HA (defaut: off, WS prefere)",
     "settings.time.heading": "Temps",
     "settings.time.ntp_server": "Serveur NTP",
-    "settings.time.timezone": "Fuseau horaire (POSIX TZ)",
+    "settings.time.timezone": "Fuseau horaire",
+    "settings.time.search": "Rechercher un fuseau horaire…",
+    "settings.time.show_zones": "Afficher les fuseaux horaires",
+    "settings.time.search_hint": "Saisissez une partie du nom d’une ville ou d’une région, puis sélectionnez un fuseau horaire.",
+    "settings.time.no_matches": "Aucun fuseau horaire correspondant",
+    "settings.time.local_time": "Heure locale actuelle",
+    "settings.time.clock_unavailable": "Heure de l’appareil indisponible ou non synchronisée",
+    "settings.time.legacy_active": "Fuseau horaire existant au format ancien",
+    "settings.time.legacy_hint": "Le fuseau horaire existant est conservé. Sélectionnez un lieu pour le remplacer.",
+    "settings.time.list_unavailable": "Liste des fuseaux horaires indisponible. Rechargez les paramètres.",
     "settings.ui.heading": "UI",
     "settings.theme.heading": "Thème",
     "settings.ui.language": "Langue",
@@ -2055,6 +2091,19 @@ const WEB_I18N_BUILTIN = {
     "settings.language.option_zh-tw": "繁體中文",
   },
   pl: {
+    "settings.time.heading": "Czas",
+    "settings.time.ntp_server": "Serwer NTP",
+    "settings.time.timezone": "Strefa czasowa",
+    "settings.time.info": "Zmiany zostaną zastosowane po ponownym uruchomieniu. Synchronizacja czasu rozpoczyna się po połączeniu z Wi-Fi.",
+    "settings.time.search": "Szukaj strefy czasowej…",
+    "settings.time.show_zones": "Pokaż strefy czasowe",
+    "settings.time.search_hint": "Wpisz część nazwy miasta lub regionu, a następnie wybierz strefę czasową.",
+    "settings.time.no_matches": "Brak pasujących stref czasowych",
+    "settings.time.local_time": "Aktualny czas lokalny",
+    "settings.time.clock_unavailable": "Czas urządzenia jest niedostępny lub nie został zsynchronizowany",
+    "settings.time.legacy_active": "Dotychczasowa strefa czasowa w starym formacie",
+    "settings.time.legacy_hint": "Dotychczasowa strefa czasowa została zachowana. Wybierz lokalizację, aby ją zastąpić.",
+    "settings.time.list_unavailable": "Lista stref czasowych jest niedostępna. Wczytaj ustawienia ponownie.",
     "common.yes": "tak",
     "common.no": "nie",
     "common.unknown_error": "nieznany błąd",
@@ -2862,7 +2911,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "启用 HA REST 回退（默认关闭，优先仅使用 WS）",
     "settings.time.heading": "时间",
     "settings.time.ntp_server": "NTP 服务器",
-    "settings.time.timezone": "时区（POSIX TZ）",
+    "settings.time.timezone": "时区",
+    "settings.time.search": "搜索时区…",
+    "settings.time.show_zones": "显示时区",
+    "settings.time.search_hint": "输入城市或区域名称的一部分，然后选择时区。",
+    "settings.time.no_matches": "没有匹配的时区",
+    "settings.time.local_time": "当前本地时间",
+    "settings.time.clock_unavailable": "设备时间不可用或尚未同步",
+    "settings.time.legacy_active": "现有旧格式时区",
+    "settings.time.legacy_hint": "已保留现有时区。选择一个地点以替换它。",
+    "settings.time.list_unavailable": "时区列表不可用，请重新加载设置。",
     "settings.ui.heading": "界面",
     "settings.theme.heading": "主题",
     "settings.ui.language": "语言",
@@ -3600,7 +3658,16 @@ const WEB_I18N_BUILTIN = {
     "settings.ha.rest_fallback": "啟用 HA REST 備援（預設關閉，優先僅使用 WS）",
     "settings.time.heading": "時間",
     "settings.time.ntp_server": "NTP 伺服器",
-    "settings.time.timezone": "時區（POSIX TZ）",
+    "settings.time.timezone": "時區",
+    "settings.time.search": "搜尋時區…",
+    "settings.time.show_zones": "顯示時區",
+    "settings.time.search_hint": "輸入城市或區域名稱的一部分，然後選擇時區。",
+    "settings.time.no_matches": "沒有符合的時區",
+    "settings.time.local_time": "目前本地時間",
+    "settings.time.clock_unavailable": "裝置時間無法取得或尚未同步",
+    "settings.time.legacy_active": "現有舊格式時區",
+    "settings.time.legacy_hint": "已保留現有時區。選擇一個地點以取代它。",
+    "settings.time.list_unavailable": "時區清單無法取得，請重新載入設定。",
     "settings.ui.heading": "使用者介面",
     "settings.theme.heading": "主題",
     "settings.ui.language": "語言",
@@ -7307,7 +7374,7 @@ function renderSettings() {
     el.settingsHaRestEnabled.checked = ha.rest_enabled === true;
   }
   el.settingsNtpServer.value = time.ntp_server || "";
-  el.settingsTimezone.value = time.timezone || "";
+  renderTimezoneSettings(time);
   if (el.settingsLanguage) {
     el.settingsLanguage.value = normalizeUiLanguage(ui.language);
   }
@@ -7748,6 +7815,165 @@ async function scanWifiNetworks(scope = "settings") {
     renderWifiScanResults(editor.wifiScanItems, scope);
     ui.scanButton.disabled = false;
   }
+}
+
+const timezonePicker = { names: [], matches: [], index: -1, bound: false, timer: null,
+  clock: NaN, received: 0, requested: -Infinity, busy: false, active: "" };
+
+function timezoneSelectionLabel() {
+  const value = el.settingsTimezone.value;
+  return timezonePicker.names.includes(value) ? value : "";
+}
+
+function closeTimezoneOptions() {
+  document.getElementById("settingsTimezoneOptions").hidden = true;
+  const search = document.getElementById("settingsTimezoneSearch");
+  search.setAttribute("aria-expanded", "false");
+  search.removeAttribute("aria-activedescendant");
+  document.getElementById("settingsTimezoneToggle").setAttribute("aria-expanded", "false");
+  search.value = timezoneSelectionLabel();
+}
+
+function selectTimezone(name) {
+  el.settingsTimezone.value = name;
+  document.getElementById("settingsTimezoneHint").textContent = t("settings.time.search_hint");
+  closeTimezoneOptions();
+}
+
+function showTimezoneOptions(query = "") {
+  const search = document.getElementById("settingsTimezoneSearch");
+  const list = document.getElementById("settingsTimezoneOptions");
+  timezonePicker.matches = timezonePicker.names.filter(name => name.toLowerCase().includes(query.trim().toLowerCase()));
+  timezonePicker.index = -1;
+  search.removeAttribute("aria-activedescendant");
+  list.replaceChildren(...timezonePicker.matches.map((name, index) => {
+    const option = document.createElement("div");
+    option.className = "timezone-option";
+    option.id = `timezone-option-${index}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", String(name === el.settingsTimezone.value));
+    option.textContent = name;
+    option.onmousedown = event => event.preventDefault();
+    option.onclick = () => selectTimezone(name);
+    return option;
+  }));
+  if (!timezonePicker.matches.length) {
+    const empty = document.createElement("div");
+    empty.className = "timezone-empty";
+    empty.setAttribute("role", "status");
+    empty.textContent = t("settings.time.no_matches");
+    list.append(empty);
+  }
+  list.hidden = false;
+  search.setAttribute("aria-expanded", "true");
+  document.getElementById("settingsTimezoneToggle").setAttribute("aria-expanded", "true");
+}
+
+function timezoneKeydown(event) {
+  const list = document.getElementById("settingsTimezoneOptions");
+  const search = document.getElementById("settingsTimezoneSearch");
+  if (event.key === "Escape" || event.key === "Tab") {
+    closeTimezoneOptions();
+    if (event.key === "Escape") event.preventDefault();
+    return;
+  }
+  if (event.key === "Enter" && !list.hidden) {
+    event.preventDefault();
+    const name = timezonePicker.matches[timezonePicker.index] ||
+      (timezonePicker.matches.length === 1 ? timezonePicker.matches[0] : null);
+    if (name) selectTimezone(name);
+    return;
+  }
+  if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+  event.preventDefault();
+  if (list.hidden) showTimezoneOptions();
+  const count = timezonePicker.matches.length;
+  if (!count) return;
+  const down = event.key === "ArrowDown";
+  timezonePicker.index = timezonePicker.index < 0 ? (down ? 0 : count - 1)
+    : (timezonePicker.index + (down ? 1 : -1) + count) % count;
+  [...list.children].forEach((option, i) => option.classList.toggle("active", i === timezonePicker.index));
+  const option = list.children[timezonePicker.index];
+  search.setAttribute("aria-activedescendant", option.id);
+  option.scrollIntoView({ block: "nearest" });
+}
+
+function receiveTimezoneClock(time) {
+  // The server's civil time reflects its actual POSIX rules, including legacy TZ.
+  // UTC formatting below avoids applying the browser's own timezone a second time.
+  timezonePicker.clock = time.clock_valid && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(time.local_time || "")
+    ? Date.parse(`${time.local_time}Z`) : NaN;
+  timezonePicker.received = performance.now();
+  timezonePicker.requested = timezonePicker.received;
+  timezonePicker.active = time.active_timezone || "";
+  updateTimezoneClock();
+}
+
+function formatTimezoneLocalTime(milliseconds) {
+  const options = { day: "2-digit", month: "short", year: "numeric", hour: "2-digit",
+    minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZone: "UTC" };
+  const locale = (editor.settings?.ui?.language || "en").replace(/^en$/, "en-GB");
+  let formatter;
+  try { formatter = new Intl.DateTimeFormat(locale, options); }
+  catch { formatter = new Intl.DateTimeFormat("en-GB", options); }
+  return formatter.format(new Date(milliseconds));
+}
+
+function updateTimezoneClock() {
+  const age = performance.now() - timezonePicker.received;
+  const valid = Number.isFinite(timezonePicker.clock) && age < 15000;
+  document.getElementById("settingsLocalTime").textContent = valid
+    ? formatTimezoneLocalTime(timezonePicker.clock + age)
+    : t("settings.time.clock_unavailable");
+  document.getElementById("settingsActiveTimezone").textContent = timezonePicker.names.includes(timezonePicker.active)
+    ? timezonePicker.active : t("settings.time.legacy_active");
+}
+
+async function tickTimezoneClock() {
+  const output = document.getElementById("settingsLocalTime");
+  if (document.hidden || output.offsetParent === null) return;
+  updateTimezoneClock();
+  if (timezonePicker.busy || performance.now() - timezonePicker.requested < 5000) return;
+  timezonePicker.busy = true;
+  timezonePicker.requested = performance.now();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4000);
+  try { receiveTimezoneClock(await apiGet("/api/settings?time_only=1", controller.signal)); }
+  catch { /* A stale clock becomes unavailable instead of running indefinitely. */ }
+  finally { window.clearTimeout(timeout); timezonePicker.busy = false; }
+}
+
+function renderTimezoneSettings(time) {
+  timezonePicker.names = Array.isArray(time.timezones) ? time.timezones.filter(name => typeof name === "string").sort() : [];
+  el.settingsTimezone.value = time.timezone || "";
+  const search = document.getElementById("settingsTimezoneSearch");
+  const toggle = document.getElementById("settingsTimezoneToggle");
+  search.placeholder = t("settings.time.search");
+  toggle.setAttribute("aria-label", t("settings.time.show_zones"));
+  search.disabled = toggle.disabled = !timezonePicker.names.length;
+  document.getElementById("settingsLocalTimeLabel").textContent = t("settings.time.local_time");
+  document.getElementById("settingsTimezoneHint").textContent = !timezonePicker.names.length
+    ? t("settings.time.list_unavailable") : timezoneSelectionLabel()
+      ? t("settings.time.search_hint") : t("settings.time.legacy_hint");
+  closeTimezoneOptions();
+  if (timezonePicker.source !== time) {
+    timezonePicker.source = time;
+    receiveTimezoneClock(time);
+  }
+  if (timezonePicker.bound) return;
+  timezonePicker.bound = true;
+  search.onfocus = () => { showTimezoneOptions(); search.select(); };
+  search.onclick = () => { if (document.getElementById("settingsTimezoneOptions").hidden) showTimezoneOptions(); };
+  search.oninput = () => showTimezoneOptions(search.value);
+  search.onkeydown = timezoneKeydown;
+  toggle.onclick = () => {
+    if (!document.getElementById("settingsTimezoneOptions").hidden) closeTimezoneOptions();
+    else { search.focus(); showTimezoneOptions(); }
+  };
+  document.getElementById("settingsTimezonePicker").onfocusout = event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) closeTimezoneOptions();
+  };
+  timezonePicker.timer = window.setInterval(tickTimezoneClock, 1000);
 }
 
 async function loadSettings(silent = false) {
@@ -9511,8 +9737,8 @@ function createWidgetIdForPage(page, type) {
   }
 }
 
-async function apiGet(path) {
-  const response = await fetch(path, { cache: "no-store" });
+async function apiGet(path, signal) {
+  const response = await fetch(path, { cache: "no-store", signal });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json();
 }
