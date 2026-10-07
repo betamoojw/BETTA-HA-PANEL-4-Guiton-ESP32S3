@@ -32,7 +32,7 @@ The browser should provide a remote representation of the actual device UI where
 
 ---
 
-## 2. Redesign and Polish the Settings Screen
+## 2. Redesign and Polish the Settings Screen - Done
 
 Use the browser-based LCD mirroring capability from Task 1 to establish a screenshot-driven UI improvement workflow.
 

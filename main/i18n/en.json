@@ -52,7 +52,15 @@
       "screen_off": "Screen off",
       "clock_24h": "24h clock",
       "show_seconds": "Seconds",
-      "show_date": "Date"
+      "show_date": "Date",
+      "description": "Adjust display and power settings",
+      "brightness_description": "Adjust screen brightness",
+      "screensaver_description": "Turn on screensaver after",
+      "saver_brightness_description": "Adjust clock display brightness",
+      "screen_off_description": "Turn off screen after",
+      "clock_24h_description": "Use 24-hour time format",
+      "show_seconds_description": "Show seconds in clock",
+      "show_date_description": "Show date on screen"
     },
     "alarm": {
       "kind_door": "door",

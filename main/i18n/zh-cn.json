@@ -52,7 +52,15 @@
       "screen_off": "关闭屏幕",
       "clock_24h": "24 小时制",
       "show_seconds": "显示秒数",
-      "show_date": "显示日期"
+      "show_date": "显示日期",
+      "description": "显示和电源设置",
+      "brightness_description": "调整屏幕亮度",
+      "screensaver_description": "屏保等待时间",
+      "saver_brightness_description": "调整时钟显示亮度",
+      "screen_off_description": "关闭屏幕等待时间",
+      "clock_24h_description": "24小时制时间显示",
+      "show_seconds_description": "在时钟上显示秒数",
+      "show_date_description": "在屏幕上显示日期"
     },
     "alarm": {
       "kind_door": "门",
